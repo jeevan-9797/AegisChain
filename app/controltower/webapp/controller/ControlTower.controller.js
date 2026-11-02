@@ -8,8 +8,9 @@ sap.ui.define([
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
     "sap/ui/dom/includeScript",
-    "sap/ui/dom/includeStylesheet"
-], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, Filter, FilterOperator, includeScript, includeStylesheet) {
+    "sap/ui/dom/includeStylesheet",
+    "com/aegis/controltower/model/BackendAdapter"
+], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, Filter, FilterOperator, includeScript, includeStylesheet, BackendAdapter) {
     "use strict";
 
     // Leaflet (open-source map library) is loaded from a CDN - a "regular tool" fallback,
@@ -26,6 +27,75 @@ sap.ui.define([
                 includeStylesheet({ url: LEAFLET + "leaflet.css", id: "leaflet-css" }),
                 includeScript({ url: LEAFLET + "leaflet.js", id: "leaflet-js" })
             ]);
+
+            // Data source: mock.json (default) or Jeevan's CAP service (see model/BackendAdapter.js)
+            var oModel = this.getOwnerComponent().getModel();
+            oModel.dataLoaded().then(function () {
+                this._mockSnapshot = JSON.parse(JSON.stringify(oModel.getData()));
+                if (BackendAdapter.getMode() === "live") { this._loadLive(); }
+            }.bind(this));
+        },
+
+        /* ---------------------------------------------------------------
+         * DATA MODE  (mock <-> live CAP backend)
+         * ------------------------------------------------------------- */
+        _isLive: function () {
+            return this.getView().getModel().getProperty("/Meta/mode") === "live";
+        },
+
+        _loadLive: function () {
+            var oModel = this.getView().getModel() || this.getOwnerComponent().getModel();
+            return BackendAdapter.loadLive(this._mockSnapshot).then(function (oData) {
+                oModel.setData(oData);
+                this.byId("incidentDetail").bindElement("/Incidents/0");
+                BackendAdapter.setMode("live");
+            }.bind(this)).catch(function (oErr) {
+                BackendAdapter.setMode("mock");
+                this._loadMock();
+                MessageBox.warning("The CAP backend is not reachable, so the app switched back to mock data.\n\n"
+                    + "Start it from the repository root with: npm start\n\nDetails: " + oErr.message);
+            }.bind(this));
+        },
+
+        _loadMock: function () {
+            var oModel = this.getView().getModel() || this.getOwnerComponent().getModel();
+            oModel.setData(JSON.parse(JSON.stringify(this._mockSnapshot)));
+            this.byId("incidentDetail").bindElement("/Incidents/0");
+        },
+
+        onModeChange: function (oEvent) {
+            var sMode = oEvent.getParameter("item").getKey();
+            BackendAdapter.setMode(sMode);
+            if (sMode === "live") {
+                this._loadLive().then(function () {
+                    if (this._isLive()) { MessageToast.show("Live CAP data loaded"); }
+                }.bind(this));
+            } else {
+                this._loadMock();
+                MessageToast.show("Mock demo data loaded");
+            }
+        },
+
+        _selectedOption: function () {
+            var oItem = this.byId("optionsTable").getSelectedItem();
+            return oItem ? oItem.getBindingContext().getObject() : null;
+        },
+
+        _decideLive: function (sDecision, sNote) {
+            var oOpt = this._selectedOption();
+            if (!oOpt || !oOpt.recId) { MessageToast.show("Select a recommendation in the table first"); return; }
+            if (oOpt.approvalStatus !== "pending") { MessageToast.show("This recommendation has already been decided"); return; }
+            BackendAdapter.decide(oOpt.recId, sDecision, sNote).then(function (oRes) {
+                MessageBox.success("Decision recorded: " + oRes.decision
+                    + "\nexecutionStatus: " + oRes.executionStatus
+                    + "\n\nThe recovery action has NOT been executed - the backend only records the decision.");
+                return this._loadLive();
+            }.bind(this)).catch(function (oErr) {
+                MessageBox.error(oErr.status === 409
+                    ? "This recommendation was already decided by someone else. Refreshing."
+                    : "Could not record the decision: " + oErr.message);
+                this._loadLive();
+            }.bind(this));
         },
 
         /* ---------------------------------------------------------------
@@ -122,8 +192,9 @@ sap.ui.define([
 
         /* ---------------------------------------------------------------
          * APPROVE / REJECT  (Incidents tab)
-         * LATER: replace the body of _executePlan with a call to the backend
-         * action  POST /odata/v4/aegis/decide  - the screen stays the same.
+         * Live mode : POST /odata/v4/aegis/decideRecommendation (records the decision only,
+         *             executionStatus "notExecuted").
+         * Mock mode : simulated story for the demo (_executePlan).
          * ------------------------------------------------------------- */
         onApprove: function () {
             var oCtx = this.byId("incidentDetail").getBindingContext();
@@ -135,7 +206,8 @@ sap.ui.define([
                 beginButton: new Button({
                     text: "Approve", type: "Emphasized",
                     press: function () {
-                        this._executePlan(oCtx, oComment.getValue());
+                        if (this._isLive()) { this._decideLive("approved", oComment.getValue()); }
+                        else { this._executePlan(oCtx, oComment.getValue()); }
                         oDialog.close();
                     }.bind(this)
                 }),
@@ -151,6 +223,7 @@ sap.ui.define([
             MessageBox.confirm("Reject the recommended plan? The incident goes back to the planner.", {
                 onClose: function (sAction) {
                     if (sAction !== MessageBox.Action.OK) { return; }
+                    if (this._isLive()) { this._decideLive("rejected", null); return; }
                     var oModel = oCtx.getModel();
                     oModel.setProperty(oCtx.getPath() + "/status", "Rejected - back to planner");
                     oModel.setProperty(oCtx.getPath() + "/statusState", "Error");
@@ -165,7 +238,7 @@ sap.ui.define([
             var sPath = oCtx.getPath();
 
             // 1. Status + all 5 stages done
-            oModel.setProperty(sPath + "/status", "Executed - approved by HK");
+            oModel.setProperty(sPath + "/status", "Executed - approved by HK (simulated in mock mode)");
             oModel.setProperty(sPath + "/statusState", "Success");
             oModel.getProperty(sPath + "/stages").forEach(function (s, i) {
                 oModel.setProperty(sPath + "/stages/" + i + "/state", "Success");
@@ -262,7 +335,9 @@ sap.ui.define([
                 "table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #D9DEE3;padding:6px;text-align:left}" +
                 "th{background:#F5F6F7}</style></head><body>" +
                 "<h1>AegisChain - Decision Audit Report</h1><p>Generated " + new Date().toLocaleString() +
-                " &middot; Chain verified: YES &middot; Figures are modeled</p>" +
+                " &middot; " + (oData.Meta && oData.Meta.mode === "live"
+                    ? "Source: live CAP backend &middot; decisions recorded, not executed &middot; no hash chain yet"
+                    : "Chain verified: YES (demo) &middot; Figures are modeled") + "</p>" +
                 "<h2>Decision trail</h2><table><tr><th>#</th><th>Time</th><th>Actor</th><th>Action</th><th>Hash</th></tr>" + rows + "</table>" +
                 "<h2>Actions executed</h2><table><tr><th>Type</th><th>Reference</th><th>Status</th></tr>" + acts + "</table>" +
                 "<p style='margin-top:32px;font-size:11px'>Confidential - generated by AegisChain</p>" +
@@ -289,8 +364,14 @@ sap.ui.define([
         },
 
         onResetDemo: function () {
+            if (this._isLive()) {
+                this.byId("policyDialog").close();
+                this._loadLive().then(function () { MessageToast.show("Live data refreshed (the CAP in-memory data resets when the server restarts)"); });
+                return;
+            }
             var oModel = this.getView().getModel();
             oModel.loadData(sap.ui.require.toUrl("com/aegis/controltower/model/mock.json")).then(function () {
+                this._mockSnapshot = JSON.parse(JSON.stringify(oModel.getData()));
                 this.byId("incidentDetail").bindElement("/Incidents/0");
                 this.byId("tabs").setSelectedKey("overview");
                 this.byId("policyDialog").close();

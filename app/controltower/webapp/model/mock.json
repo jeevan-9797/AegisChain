@@ -609,5 +609,11 @@
     "landedCostChange": "-",
     "bestSaving": "-",
     "results": []
+  },
+  "Meta": {
+    "mode": "mock",
+    "modeLabel": "MOCK · demo data",
+    "modeState": "Information",
+    "chainVerified": true
   }
 }
