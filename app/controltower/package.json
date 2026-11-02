@@ -1,0 +1,16 @@
+{
+  "name": "controltower",
+  "version": "0.0.1",
+  "description": "AegisChain Operator Control Tower (SAPUI5 freestyle app, mock data)",
+  "private": true,
+  "keywords": ["ui5", "sapui5", "aegischain"],
+  "devDependencies": {
+    "@sap/ux-ui5-tooling": "1",
+    "@ui5/cli": "^4.0.0"
+  },
+  "scripts": {
+    "start": "fiori run --open \"index.html\"",
+    "start-local": "fiori run --config ./ui5-local.yaml --open \"index.html\"",
+    "build": "ui5 build --config=ui5.yaml --clean-dest --dest dist"
+  }
+}

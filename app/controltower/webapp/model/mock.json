@@ -1,0 +1,613 @@
+{
+  "Kpis": {
+    "openIncidents": "2",
+    "atRisk": "3",
+    "lossAvoided": "374",
+    "llmCalls": "7",
+    "autoDecisions": "1",
+    "decisionsNote": "of 2 decisions",
+    "notifications": "3"
+  },
+  "Policies": [
+    {
+      "label": "Approval threshold",
+      "value": "$50,000"
+    },
+    {
+      "label": "Hard spend cap (blocks plan)",
+      "value": "$80,000"
+    },
+    {
+      "label": "Carrier / supplier change needs approval",
+      "value": "Yes"
+    },
+    {
+      "label": "Min classifier confidence",
+      "value": "60%"
+    },
+    {
+      "label": "WHO-prequalified suppliers only",
+      "value": "Yes"
+    },
+    {
+      "label": "Banned carriers",
+      "value": "1 (OceanX Lines)"
+    },
+    {
+      "label": "Feed polling",
+      "value": "Every 15 min"
+    }
+  ],
+  "Notifications": [
+    {
+      "title": "Approval needed - Split sea-air for #SAP-8842",
+      "description": "Carrier change requires sign-off",
+      "icon": "sap-icon://alert",
+      "time": "now",
+      "state": "Error"
+    },
+    {
+      "title": "Auto-executed - Mombasa strike",
+      "description": "Rerouted via Dar es Salaam within policy",
+      "icon": "sap-icon://accept",
+      "time": "18m",
+      "state": "Success"
+    },
+    {
+      "title": "2 signals waiting in analyst queue",
+      "description": "Confidence below 60%",
+      "icon": "sap-icon://person-placeholder",
+      "time": "25m",
+      "state": "Warning"
+    }
+  ],
+  "Nodes": [
+    {
+      "name": "Antwerp (EU plant port)",
+      "lat": 51.22,
+      "lon": 4.4
+    },
+    {
+      "name": "Port Said / Suez",
+      "lat": 31.26,
+      "lon": 32.3
+    },
+    {
+      "name": "Bab-el-Mandeb (chokepoint)",
+      "lat": 12.58,
+      "lon": 43.33
+    },
+    {
+      "name": "Cape of Good Hope",
+      "lat": -34.36,
+      "lon": 18.47
+    },
+    {
+      "name": "Mombasa",
+      "lat": -4.04,
+      "lon": 39.67
+    },
+    {
+      "name": "Dar es Salaam",
+      "lat": -6.82,
+      "lon": 39.29
+    },
+    {
+      "name": "Nhava Sheva (India)",
+      "lat": 18.95,
+      "lon": 72.95
+    },
+    {
+      "name": "Nairobi (NBO)",
+      "lat": -1.32,
+      "lon": 36.93
+    },
+    {
+      "name": "Brussels (BRU)",
+      "lat": 50.9,
+      "lon": 4.48
+    }
+  ],
+  "Lanes": [
+    {
+      "name": "Suez / Red Sea route",
+      "mode": "SEA",
+      "status": "CLOSED",
+      "path": [
+        [
+          51.22,
+          4.4
+        ],
+        [
+          36.1,
+          -5.6
+        ],
+        [
+          31.26,
+          32.3
+        ],
+        [
+          12.58,
+          43.33
+        ],
+        [
+          -4.04,
+          39.67
+        ]
+      ]
+    },
+    {
+      "name": "Cape detour",
+      "mode": "SEA",
+      "status": "DEGRADED",
+      "path": [
+        [
+          51.22,
+          4.4
+        ],
+        [
+          28.1,
+          -15.4
+        ],
+        [
+          -34.36,
+          18.47
+        ],
+        [
+          -4.04,
+          39.67
+        ]
+      ]
+    },
+    {
+      "name": "Air bridge BRU - NBO",
+      "mode": "AIR",
+      "status": "OPEN",
+      "path": [
+        [
+          50.9,
+          4.48
+        ],
+        [
+          -1.32,
+          36.93
+        ]
+      ]
+    },
+    {
+      "name": "Road NBO - Mombasa",
+      "mode": "ROAD",
+      "status": "OPEN",
+      "path": [
+        [
+          -1.32,
+          36.93
+        ],
+        [
+          -4.04,
+          39.67
+        ]
+      ]
+    },
+    {
+      "name": "India - Mombasa (re-source)",
+      "mode": "SEA",
+      "status": "OPEN",
+      "path": [
+        [
+          18.95,
+          72.95
+        ],
+        [
+          -4.04,
+          39.67
+        ]
+      ]
+    },
+    {
+      "name": "Dar es Salaam - Mombasa road",
+      "mode": "ROAD",
+      "status": "OPEN",
+      "path": [
+        [
+          -6.82,
+          39.29
+        ],
+        [
+          -4.04,
+          39.67
+        ]
+      ]
+    }
+  ],
+  "Consignments": [
+    {
+      "id": "#SAP-8842",
+      "lat": 35.5,
+      "lon": 18.0,
+      "status": "AT RISK"
+    },
+    {
+      "id": "#SAP-8851",
+      "lat": -6.0,
+      "lon": 41.0,
+      "status": "REROUTED"
+    }
+  ],
+  "Incidents": [
+    {
+      "id": "SAP-8842",
+      "title": "Red Sea closed to container traffic",
+      "severity": "CRITICAL 9.4",
+      "severityState": "Error",
+      "cargo": "40,000 vaccine doses",
+      "value": "$450K",
+      "destination": "Mombasa, Kenya",
+      "viability": "9 days",
+      "status": "Awaiting approval",
+      "statusState": "Warning",
+      "stages": [
+        {
+          "name": "SENSE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "SIMULATE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "VERIFY",
+          "state": "Warning",
+          "icon": "sap-icon://pending"
+        },
+        {
+          "name": "REROUTE",
+          "state": "None",
+          "icon": "sap-icon://circle-task"
+        },
+        {
+          "name": "REBALANCE",
+          "state": "None",
+          "icon": "sap-icon://circle-task"
+        }
+      ],
+      "options": [
+        {
+          "name": "Cape detour",
+          "route": "Antwerp > Cape of Good Hope > Mombasa",
+          "delay": "+18 d",
+          "extraCost": "$14,000",
+          "spoilage": "88-95%",
+          "expectedLoss": "$428K",
+          "lossPct": 100,
+          "barState": "Error",
+          "gate": "Passes",
+          "gateState": "None",
+          "highlight": "None"
+        },
+        {
+          "name": "Full air charter",
+          "route": "BRU > NBO > road",
+          "delay": "+1 d",
+          "extraCost": "$95,000",
+          "spoilage": "1-2%",
+          "expectedLoss": "$100K",
+          "lossPct": 23,
+          "barState": "None",
+          "gate": "Blocked: hard cap $80K",
+          "gateState": "Error",
+          "highlight": "Error"
+        },
+        {
+          "name": "Split sea-air (recommended)",
+          "route": "Air 11,200 doses BRU > NBO, rest via Cape",
+          "delay": "+2 d",
+          "extraCost": "$38,500",
+          "spoilage": "2-5%",
+          "expectedLoss": "$54K",
+          "lossPct": 13,
+          "barState": "Information",
+          "gate": "Needs sign-off: carrier change",
+          "gateState": "Warning",
+          "highlight": "Information"
+        },
+        {
+          "name": "Re-source from India",
+          "route": "Pune > Nhava Sheva > Mombasa (WHO-PQ)",
+          "delay": "+5 d",
+          "extraCost": "$46,000",
+          "spoilage": "3-6%",
+          "expectedLoss": "$66K",
+          "lossPct": 15,
+          "barState": "None",
+          "gate": "Passes",
+          "gateState": "None",
+          "highlight": "None"
+        }
+      ],
+      "gates": [
+        {
+          "text": "Within hard cap $80K",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": "Extra spend $38,500 leaves $41,500 headroom under the cap"
+        },
+        {
+          "text": "WHO-prequalified supplier",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": "Original manufacturing lot remains valid"
+        },
+        {
+          "text": "No sanctioned carrier",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": "No flagged vessels or air operators on the proposed route"
+        },
+        {
+          "text": "Viability window respected",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": "Air batch reaches Nairobi in ~2 days, inside the 9-day window"
+        },
+        {
+          "text": "Carrier change - human sign-off",
+          "result": "Required",
+          "state": "Warning",
+          "icon": "sap-icon://alert",
+          "detail": "Switching to an air carrier for the Nairobi leg needs a director's approval"
+        }
+      ],
+      "brief": {
+        "headline": "Split sea-air saves ~$374K versus the Cape detour",
+        "why": "The Cape route takes 18 extra days against a 9-day viability window, so most doses would spoil. Flying only the 11,200 doses needed until the ship arrives keeps clinics supplied at $38.5K extra freight.",
+        "mustCheck": [
+          {
+            "text": "Air carrier has validated 2-8 C capacity at BRU"
+          },
+          {
+            "text": "Mombasa store can receive the air leg within 48 h"
+          }
+        ],
+        "consigneeMessage": "11,200 doses arrive by air via Nairobi in 2 days; the remainder follows by sea. No action needed."
+      },
+      "urgency": "Decision urgency: the cold packaging threshold expires in 9 days. The normal reroute around the Cape of Good Hope would spoil the whole shipment.",
+      "urgencyType": "Warning",
+      "delta": "Split sea-air saves $374K versus the Cape detour and $12K versus re-sourcing from India."
+    },
+    {
+      "id": "SAP-8851",
+      "title": "Mombasa port labour strike",
+      "severity": "HIGH 6.8",
+      "severityState": "Warning",
+      "cargo": "Insulin supplies",
+      "value": "$120K",
+      "destination": "Mombasa, Kenya",
+      "viability": "34 hours buffer",
+      "status": "Auto-executed via Dar es Salaam",
+      "statusState": "Success",
+      "stages": [
+        {
+          "name": "SENSE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "SIMULATE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "VERIFY",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "REROUTE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        },
+        {
+          "name": "REBALANCE",
+          "state": "Success",
+          "icon": "sap-icon://accept"
+        }
+      ],
+      "options": [
+        {
+          "name": "Alternate port Dar es Salaam + road",
+          "route": "Dar es Salaam > road > Mombasa",
+          "delay": "+3 d",
+          "extraCost": "$9,800",
+          "spoilage": "1-3%",
+          "expectedLoss": "$13K",
+          "lossPct": 30,
+          "barState": "Information",
+          "gate": "Passes - auto",
+          "gateState": "Success",
+          "highlight": "Information"
+        },
+        {
+          "name": "Wait at anchor",
+          "route": "Mombasa anchorage",
+          "delay": "+7 d",
+          "extraCost": "$3,000",
+          "spoilage": "20-30%",
+          "expectedLoss": "$33K",
+          "lossPct": 75,
+          "barState": "Error",
+          "gate": "Passes",
+          "gateState": "None",
+          "highlight": "None"
+        }
+      ],
+      "gates": [
+        {
+          "text": "Under approval threshold $50K",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": ""
+        },
+        {
+          "text": "No carrier change",
+          "result": "Pass",
+          "state": "Success",
+          "icon": "sap-icon://accept",
+          "detail": ""
+        }
+      ],
+      "brief": {
+        "headline": "Executed automatically within policy",
+        "why": "The alternate port adds 3 days but stays inside the insulin buffer and under the $50K approval threshold.",
+        "mustCheck": [],
+        "consigneeMessage": "Your insulin delivery arrives via Dar es Salaam, 3 days later than planned."
+      },
+      "urgency": "Handled automatically: the cost stayed under the $50K approval threshold and no carrier changed.",
+      "urgencyType": "Success",
+      "delta": "Alternate port saves $20K versus waiting at anchor."
+    }
+  ],
+  "Signals": [
+    {
+      "time": "10:14",
+      "source": "GDACS",
+      "headline": "Red Sea container traffic halted after new security incidents",
+      "category": "Chokepoint",
+      "severity": "3",
+      "lanes": "BAB_EL_MANDEB, SUEZ",
+      "confidence": 94,
+      "status": "Incident created"
+    },
+    {
+      "time": "10:02",
+      "source": "News RSS",
+      "headline": "Mombasa dockworkers begin indefinite strike",
+      "category": "Port",
+      "severity": "2",
+      "lanes": "MBA",
+      "confidence": 88,
+      "status": "Incident created"
+    },
+    {
+      "time": "09:47",
+      "source": "News RSS",
+      "headline": "Maritime advisory issued for Strait of Hormuz",
+      "category": "Chokepoint",
+      "severity": "2",
+      "lanes": "HORMUZ",
+      "confidence": 81,
+      "status": "Watching"
+    },
+    {
+      "time": "09:31",
+      "source": "Open-Meteo Marine",
+      "headline": "Wave heights above 5 m forecast in Arabian Sea",
+      "category": "Weather",
+      "severity": "2",
+      "lanes": "NHAVA_MBA",
+      "confidence": 77,
+      "status": "Watching"
+    },
+    {
+      "time": "09:12",
+      "source": "News RSS",
+      "headline": "Panama Canal draft restriction extended",
+      "category": "Chokepoint",
+      "severity": "1",
+      "lanes": "PANAMA",
+      "confidence": 85,
+      "status": "Watching"
+    },
+    {
+      "time": "08:58",
+      "source": "News RSS",
+      "headline": "Reports of possible new tariff on EU pharmaceuticals",
+      "category": "Tariff",
+      "severity": "1",
+      "lanes": "",
+      "confidence": 52,
+      "status": "Needs analyst"
+    },
+    {
+      "time": "08:40",
+      "source": "News RSS",
+      "headline": "Unconfirmed reports of reefer shortage at Port Said",
+      "category": "Port",
+      "severity": "1",
+      "lanes": "SUEZ",
+      "confidence": 48,
+      "status": "Needs analyst"
+    },
+    {
+      "time": "08:21",
+      "source": "News RSS",
+      "headline": "Shipping line announces new livery for its fleet",
+      "category": "Other",
+      "severity": "1",
+      "lanes": "",
+      "confidence": 96,
+      "status": "Ignored"
+    }
+  ],
+  "AuditLog": [
+    {
+      "time": "10:14:02",
+      "actor": "AGENT A",
+      "actorState": "Information",
+      "action": "Signal parsed (GDACS + News RSS)",
+      "hash": "a3f9c1d2"
+    },
+    {
+      "time": "10:14:03",
+      "actor": "AGENT A",
+      "actorState": "Information",
+      "action": "Exposure found: #SAP-8842",
+      "hash": "7be21f90"
+    },
+    {
+      "time": "10:14:04",
+      "actor": "AGENT A",
+      "actorState": "Information",
+      "action": "4 options simulated",
+      "hash": "c41d8e77"
+    },
+    {
+      "time": "10:14:04",
+      "actor": "GUARDIAN",
+      "actorState": "Warning",
+      "action": "Full air blocked by hard cap $80K",
+      "hash": "0e93ab15"
+    },
+    {
+      "time": "10:14:05",
+      "actor": "GUARDIAN",
+      "actorState": "Warning",
+      "action": "Decision brief generated (LLM)",
+      "hash": "5d2c7f41"
+    },
+    {
+      "time": "10:14:05",
+      "actor": "GUARDIAN",
+      "actorState": "Warning",
+      "action": "Approval requested in My Inbox",
+      "hash": "9a61be03"
+    }
+  ],
+  "Actions": [],
+  "WhatIf": {
+    "scenario": "TARIFF",
+    "duty": 50,
+    "scope": "ALL",
+    "ordersAffected": "-",
+    "landedCostChange": "-",
+    "bestSaving": "-",
+    "results": []
+  }
+}
