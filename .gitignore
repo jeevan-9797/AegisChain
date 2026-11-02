@@ -1,10 +1,12 @@
 node_modules/
+dist/
 target/
 _out/
 gen/
 
 .cdsrc-private.json
 default-*.json
+.env
 *.sqlite
 
 # MTA
