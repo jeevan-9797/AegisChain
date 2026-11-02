@@ -22,11 +22,17 @@ The current `start` script runs `cds-serve`. During development, with the CAP de
 cds watch
 ```
 
-The repository is currently a generated CAP scaffold. It has no domain model or service yet, so a successful server start does not mean AegisChain workflows are implemented. Once the SQLite model is added, developers should use the local SQLite configuration and documented seed data for the demonstration.
+The local SQLite model and seed data are under `db/`. The CAP service layer is under `srv/`. Use the documented local SQLite workflow for development; no production SAP credentials are needed for the mock-data demonstration.
 
 ## Test and quality checks
 
-There is currently no test script, test suite, or lint script in `package.json`. Do not treat the absence of a test command as a passing test result. As application phases add features, add focused automated tests and scripts for domain behavior, services, and acceptance criteria. Record the exact commands and outcomes in the phase's completion notes.
+Run the current automated checks with:
+
+```sh
+npm test
+```
+
+The current suite validates CAP model loading and compilation. Add focused automated tests for service behavior and acceptance criteria as those workflows grow. Record exact commands and outcomes in each phase's completion notes. There is no lint script yet.
 
 The repository includes an ESLint configuration extending SAP CAP's recommended rules. When linting is configured, use the project script rather than assuming a global ESLint installation.
 
@@ -48,3 +54,11 @@ The repository includes an ESLint configuration extending SAP CAP's recommended 
 ## Current repository state
 
 At the time this guide was written, `main` has one local commit and `origin/main` has a different one-commit history with no common ancestor. The remote commit contains `README.md`, while the local generated scaffold contains `readme.md`. Do not perform a routine pull or push until the owner has chosen how to reconcile those histories. Preserve both commits and resolve the README case conflict deliberately as part of a merge review.
+
+## Backend workflow assumptions
+
+- Disruption type and severity values remain open vocabularies because the MVP documents no allowed list. The service stores supplied values without inferring a taxonomy.
+- A disruption signal must identify at least one existing affected shipment or inventory item. CAP/database referential integrity validates the links.
+- Recommendations are caller-provided advisory records; no recommendation generation logic is included. New records always start pending.
+- A decision is allowed once, from pending to approved or rejected. The request user's CAP identity is recorded; authentication and enterprise approver roles are not configured in this demo phase.
+- Approval records a decision only. It never executes or writes a recovery action to S/4HANA.
