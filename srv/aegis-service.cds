@@ -10,5 +10,9 @@ service AegisService {
     recommendationID : UUID,
     decision         : String enum { approved; rejected; },
     decisionNote     : String(500)
-  );
+  ) returns {
+    recommendationID : UUID;
+    decision          : String;
+    executionStatus   : String;
+  };
 }

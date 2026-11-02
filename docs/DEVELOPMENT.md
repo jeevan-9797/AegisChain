@@ -32,7 +32,7 @@ Run the current automated checks with:
 npm test
 ```
 
-The current suite validates CAP model loading and compilation. Add focused automated tests for service behavior and acceptance criteria as those workflows grow. Record exact commands and outcomes in each phase's completion notes. There is no lint script yet.
+The suite validates CAP model loading/compilation and exercises the OData service over HTTP against an isolated CAP process using its default in-memory SQLite database and seed data. The tests cover seeded reads, signal creation and impact links, signal validation, recommendation creation, approval/rejection, repeated decisions, and direct recommendation update rejection. CAP's local mocked authentication is used; production authentication, authorization roles, AI/BPA integrations, and external action execution are not covered. There is no lint script yet.
 
 The repository includes an ESLint configuration extending SAP CAP's recommended rules. When linting is configured, use the project script rather than assuming a global ESLint installation.
 
