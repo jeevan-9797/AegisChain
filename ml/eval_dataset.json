@@ -1,0 +1,282 @@
+[
+  {
+    "id": 1,
+    "text": "Houthi anti-ship missile attack strikes commercial vessel off Bab el-Mandeb, forcing major carriers to suspend Red Sea transits.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 3,
+    "expected_lanes": ["RED_SEA", "ASIA_EUROPE"]
+  },
+  {
+    "id": 2,
+    "text": "Ultra-large container ship runs aground in southern section of Suez Canal, halting all northbound convoys.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 3,
+    "expected_lanes": ["SUEZ", "ASIA_EUROPE"]
+  },
+  {
+    "id": 3,
+    "text": "Military gunboats intercept and seize foreign oil and chemical tanker transiting the Strait of Hormuz.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 3,
+    "expected_lanes": ["HORMUZ", "MIDDLE_EAST"]
+  },
+  {
+    "id": 4,
+    "text": "Naval coalition issues urgent security warning for Bab el-Mandeb strait following drone boat skirmish near maritime corridors.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 2,
+    "expected_lanes": ["RED_SEA", "ASIA_EUROPE"]
+  },
+  {
+    "id": 5,
+    "text": "Suez Canal Authority announces emergency maintenance and single-lane transit restriction due to dredging operations.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 2,
+    "expected_lanes": ["SUEZ", "ASIA_EUROPE"]
+  },
+  {
+    "id": 6,
+    "text": "Heavy electronic jamming and GPS spoofing disrupt merchant navigation across the Strait of Hormuz.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 2,
+    "expected_lanes": ["HORMUZ", "MIDDLE_EAST"]
+  },
+  {
+    "id": 7,
+    "text": "Carriers Maersk and CMA CGM divert entire Asia-Europe fleets via Cape of Good Hope avoiding Bab el-Mandeb threat.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 3,
+    "expected_lanes": ["RED_SEA", "CAPE_OF_GOOD_HOPE", "ASIA_EUROPE"]
+  },
+  {
+    "id": 8,
+    "text": "Naval escort convoy halted in Bab el-Mandeb after maritime floating mine detonation in main navigation channel.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 3,
+    "expected_lanes": ["RED_SEA", "ASIA_EUROPE"]
+  },
+  {
+    "id": 9,
+    "text": "Severe freshwater drought cuts daily booking slots by forty percent across the Panama Canal locks.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 2,
+    "expected_lanes": ["PANAMA_CANAL"]
+  },
+  {
+    "id": 10,
+    "text": "Maritime intelligence advisory warns of heightened drone swarms along southern Red Sea shipping approaches.",
+    "expected_category": "CHOKEPOINT",
+    "expected_severity": 2,
+    "expected_lanes": ["RED_SEA", "ASIA_EUROPE"]
+  },
+  {
+    "id": 11,
+    "text": "Dockworkers at Mombasa Port (MBA) initiate wildcat strike, paralyzing East Africa container terminal operations.",
+    "expected_category": "PORT",
+    "expected_severity": 3,
+    "expected_lanes": ["EAST_AFRICA", "MOMBASA_PORT"]
+  },
+  {
+    "id": 12,
+    "text": "Severe yard congestion at Port of Mombasa causes 10-day dwell times for refrigerated pharma cargo.",
+    "expected_category": "PORT",
+    "expected_severity": 2,
+    "expected_lanes": ["EAST_AFRICA", "MOMBASA_PORT"]
+  },
+  {
+    "id": 13,
+    "text": "Gantry crane breakdown at Kilindini Harbour halts reefer container offloading and terminal gate throughput.",
+    "expected_category": "PORT",
+    "expected_severity": 2,
+    "expected_lanes": ["EAST_AFRICA", "MOMBASA_PORT"]
+  },
+  {
+    "id": 14,
+    "text": "Rotterdam port container terminal workers stage 48-hour walkout over automated gate contract dispute.",
+    "expected_category": "PORT",
+    "expected_severity": 2,
+    "expected_lanes": ["EUROPE_GATEWAY"]
+  },
+  {
+    "id": 15,
+    "text": "Critical power grid failure at Jebel Ali container terminal disrupts cold-chain reefer plug-in monitoring.",
+    "expected_category": "PORT",
+    "expected_severity": 2,
+    "expected_lanes": ["MIDDLE_EAST"]
+  },
+  {
+    "id": 16,
+    "text": "Ministry of Commerce imposes sudden 25% countervailing tariff on imported active pharmaceutical ingredients.",
+    "expected_category": "TARIFF",
+    "expected_severity": 2,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 17,
+    "text": "Customs agency announces emergency embargo on temperature-sensitive biologic imports lacking approved digital certification.",
+    "expected_category": "TARIFF",
+    "expected_severity": 3,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 18,
+    "text": "Retaliatory customs duties slap specialty medical glass vials and sterile packaging entering from Asian manufacturers.",
+    "expected_category": "TARIFF",
+    "expected_severity": 2,
+    "expected_lanes": ["TRANS_PACIFIC", "ASIA_EUROPE"]
+  },
+  {
+    "id": 19,
+    "text": "New cross-border regulatory inspection mandate halts clearance of cold-chain insulin shipments at customs border.",
+    "expected_category": "TARIFF",
+    "expected_severity": 3,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 20,
+    "text": "Trade department invokes national security sanctions, blocking clearance of precision cold-chain data loggers.",
+    "expected_category": "TARIFF",
+    "expected_severity": 2,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 21,
+    "text": "Bilateral trade dispute triggers immediate 15% tariff surcharge on pharmaceutical excipients and finished dosage forms.",
+    "expected_category": "TARIFF",
+    "expected_severity": 2,
+    "expected_lanes": ["TRANS_PACIFIC"]
+  },
+  {
+    "id": 22,
+    "text": "Customs border agency tightens regulatory clearance procedures, triggering 5-day document audit delays for biopharma.",
+    "expected_category": "TARIFF",
+    "expected_severity": 1,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 23,
+    "text": "Emergency trade embargo enacted on critical refrigerated vaccines amidst geopolitical trade standoff.",
+    "expected_category": "TARIFF",
+    "expected_severity": 3,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 24,
+    "text": "Commerce authorities enact anti-dumping duty and quota restrictions on foreign medical cold-box manufacturing parts.",
+    "expected_category": "TARIFF",
+    "expected_severity": 1,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 25,
+    "text": "Port health authority issues administrative freeze on uncertified bio-pharma freight pending customs tariff settlement.",
+    "expected_category": "TARIFF",
+    "expected_severity": 2,
+    "expected_lanes": ["GLOBAL_TRADE"]
+  },
+  {
+    "id": 26,
+    "text": "Category 4 Tropical Cyclone Cheneso batters Indian Ocean shipping lanes, halting regional feeder vessel traffic.",
+    "expected_category": "WEATHER",
+    "expected_severity": 3,
+    "expected_lanes": ["INDIAN_OCEAN", "EAST_AFRICA"]
+  },
+  {
+    "id": 27,
+    "text": "Super Typhoon approaching Luzon Strait prompts maritime safety warnings and widespread commercial vessel diversions.",
+    "expected_category": "WEATHER",
+    "expected_severity": 3,
+    "expected_lanes": ["TRANS_PACIFIC", "ASIA_PACIFIC"]
+  },
+  {
+    "id": 28,
+    "text": "Severe North Atlantic winter gale generates 14-meter swell, delaying westbound transatlantic containership passages.",
+    "expected_category": "WEATHER",
+    "expected_severity": 2,
+    "expected_lanes": ["NORTH_ATLANTIC"]
+  },
+  {
+    "id": 29,
+    "text": "Extreme monsoon squall and torrential sea conditions force temporary closure of Arabian Sea navigation channels.",
+    "expected_category": "WEATHER",
+    "expected_severity": 2,
+    "expected_lanes": ["ARABIAN_SEA"]
+  },
+  {
+    "id": 30,
+    "text": "Dense fog and gale-force storm system cause zero visibility and navigation halt along English Channel shipping routes.",
+    "expected_category": "WEATHER",
+    "expected_severity": 2,
+    "expected_lanes": ["NORTH_SEA"]
+  },
+  {
+    "id": 31,
+    "text": "Real Madrid advances to Champions League final after dramatic stoppage time comeback victory.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 32,
+    "text": "Leading consumer electronics brand unveils ultra-thin OLED television and smart home speaker lineup.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 33,
+    "text": "Summer box office smash surpasses one billion dollars globally in third record-breaking theatrical weekend.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 34,
+    "text": "Renowned French pastry chef wins international award for innovative lavender honey almond macaron.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 35,
+    "text": "NASA James Webb Space Telescope captures stunning infrared imagery of distant spiral galaxy cluster.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 36,
+    "text": "Silicon Valley corporate mindfulness startup closes thirty million dollar Series B venture funding round.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 37,
+    "text": "Grand Slam tennis championship opens with defending men's singles champion claiming straight-sets victory.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 38,
+    "text": "Milan Fashion Week showcases sustainable linen and recycled cashmere knitwear collections for autumn.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 39,
+    "text": "Streaming video platform greenlights award-winning historical drama series for two additional seasons.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  },
+  {
+    "id": 40,
+    "text": "Local community urban agriculture collective celebrates bumper organic heirloom tomato harvest festival.",
+    "expected_category": "OTHER",
+    "expected_severity": 1,
+    "expected_lanes": []
+  }
+]
