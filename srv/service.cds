@@ -1,7 +1,8 @@
-using { aegischain.db as my } from '../db/schema';
+using { aegischain.db as db } from '../db/schema';
 
-service AegisChainService @(path: '/odata/v4/aegischain') {
-    entity Suppliers as projection on my.Suppliers;
-    entity Shipments as projection on my.Shipments;
-    entity RiskAlerts as projection on my.RiskAlerts;
+service AegisService @(path: '/odata/v4/aegischain') {
+  entity Shipments         as projection on db.Shipments;
+  entity DisruptionSignals as projection on db.DisruptionSignals;
+  entity Suppliers         as projection on db.Suppliers;
+  entity RiskAlerts        as projection on db.RiskAlerts;
 }
