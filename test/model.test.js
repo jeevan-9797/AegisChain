@@ -20,6 +20,8 @@ test('CAP database and service models compile with the intended public entities 
   // Verify Shipment-to-Supplier and RiskAlert-to-Supplier associations
   assert.ok(model.definitions['aegischain.Shipments'].elements.supplier, 'Expected supplier association on Shipments')
   assert.ok(model.definitions['aegischain.RiskAlerts'].elements.supplier, 'Expected supplier association on RiskAlerts')
+  assert.ok(model.definitions['aegischain.Recommendations'].elements.executionStatus,
+    'Expected persisted recommendation execution status')
 
   assert.deepEqual(Object.keys(model.definitions['aegischain.RecommendationApprovalStatus'].enum).sort(), 
     ['approved', 'pending', 'rejected'])

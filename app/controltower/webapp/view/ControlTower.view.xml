@@ -82,6 +82,10 @@
                     <!-- ===================== 2. SIGNALS ===================== -->
                     <IconTabFilter text="Signals" key="signals" icon="sap-icon://feed">
                         <OverflowToolbar>
+                            <Button text="Create live disruption" icon="sap-icon://add" type="Emphasized"
+                                    press=".onCreateLiveIncident" visible="{= ${/Meta/mode} === 'live' }"/>
+                            <Button text="Evaluate incident with ML" press=".onEvaluateIncidentWithML"
+                                    visible="{= ${/Meta/mode} === 'live' }"/>
                             <SearchField id="signalSearch" width="18rem" placeholder="Search headlines" liveChange=".onSignalFilter"/>
                             <SegmentedButton id="signalCategory" selectedKey="All" selectionChange=".onSignalFilter">
                                 <items>

@@ -10,7 +10,7 @@ server:
         ignoreCertErrors: false
         backend:
           - path: /odata
-            url: http://localhost:4004
+            url: http://localhost:4404
         ui5:
           path:
             - /resources

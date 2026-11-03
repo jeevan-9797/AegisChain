@@ -81,6 +81,7 @@ sap.ui.define([], function () {
                 gate: ap.text + (r.decidedBy ? " (" + r.decidedBy + ")" : ""),
                 gateState: ap.state,
                 approvalStatus: r.approvalStatus,
+                executionStatus: r.executionStatus || "notExecuted",
                 source: r.source,
                 highlight: r.ID === firstPendingId ? "Information" : "None"
             };
@@ -169,6 +170,44 @@ sap.ui.define([], function () {
             .catch(function () { return null; });
     }
 
+    function postJSON(path, payload) {
+        return fetchCsrf().then(function (token) {
+            var headers = { "Content-Type": "application/json", Accept: "application/json" };
+            if (token) { headers["X-CSRF-Token"] = token; }
+            return fetch(SERVICE + path, {
+                method: "POST",
+                headers: headers,
+                credentials: "include",
+                body: JSON.stringify(payload)
+            });
+        }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (body) {
+                if (!res.ok) {
+                    var msg = (body && body.error && body.error.message) || ("HTTP " + res.status);
+                    var err = new Error(msg);
+                    err.status = res.status;
+                    throw err;
+                }
+                return body;
+            });
+        });
+    }
+
+    function hasExplicitImpacts(signal) {
+        function validLinks(links, foreignKey, association) {
+            return Array.isArray(links) && links.every(function (link) {
+                var id = link && (link[foreignKey] || (link[association] && link[association].ID));
+                return typeof id === "string" && id.trim().length > 0;
+            });
+        }
+
+        var shipments = signal.shipmentImpacts || [];
+        var inventory = signal.inventoryImpacts || [];
+        if (!validLinks(shipments, "shipment_ID", "shipment")
+            || !validLinks(inventory, "inventoryItem_ID", "inventoryItem")) { return false; }
+        return shipments.length > 0 || inventory.length > 0;
+    }
+
     return {
         getMode: function () {
             var p = new URLSearchParams(window.location.search).get("mode");
@@ -178,6 +217,77 @@ sap.ui.define([], function () {
 
         setMode: function (sMode) {
             try { window.localStorage.setItem(STORAGE_KEY, sMode); } catch (e) { /* storage unavailable */ }
+        },
+
+        /** Fetch explicit CAP records for the live impact selectors. */
+        getImpactTargets: function () {
+            return Promise.all([readJSON("Shipments"), readJSON("InventoryItems")]).then(function (results) {
+                return { shipments: results[0].value || [], inventoryItems: results[1].value || [] };
+            });
+        },
+
+        /** Create a signal with explicit impact IDs, then a linked pending fallback recommendation. */
+        createIncident: function (signal, recommendation) {
+            if (!signal || !hasExplicitImpacts(signal)) {
+                return Promise.reject(new Error("Select at least one explicit shipment or inventory impact"));
+            }
+            if (!recommendation || !String(recommendation.action || "").trim()
+                || !String(recommendation.rationale || "").trim()) {
+                return Promise.reject(new Error("Recommendation action and rationale are required"));
+            }
+
+            var signalPayload = Object.assign({}, signal, { source: "demoScenario" });
+            return postJSON("DisruptionSignals", signalPayload).then(function (createdSignal) {
+                var recommendationPayload = Object.assign({}, recommendation, {
+                    signal_ID: createdSignal.ID,
+                    source: "fallback",
+                    approvalStatus: "pending",
+                    executionStatus: "notExecuted"
+                });
+                return postJSON("Recommendations", recommendationPayload).then(function (createdRecommendation) {
+                    return { signal: createdSignal, recommendation: createdRecommendation };
+                }).catch(function (error) {
+                    error.signalID = createdSignal.ID;
+                    error.signalPersisted = true;
+                    error.message = "Signal " + createdSignal.ID
+                        + " remains persisted in CAP, but recommendation creation failed: " + error.message;
+                    throw error;
+                });
+            });
+        },
+
+        /** Evaluate one feed through CAP using only caller-selected operational impact IDs. */
+        evaluateIncident: function (request) {
+            if (!request || !Array.isArray(request.feed_items) || !request.feed_items.length) {
+                return Promise.reject(new Error("Enter at least one disruption feed item"));
+            }
+            if (!Array.isArray(request.shipmentIDs) || !Array.isArray(request.inventoryItemIDs)) {
+                return Promise.reject(new Error("Select an existing shipment or inventory impact explicitly"));
+            }
+            var validIDs = function (ids) {
+                return ids.every(function (id) { return typeof id === "string" && id.trim().length > 0; });
+            };
+            if (!validIDs(request.shipmentIDs) || !validIDs(request.inventoryItemIDs)) {
+                return Promise.reject(new Error("Impact selections must contain explicit CAP IDs"));
+            }
+            if (!request.shipmentIDs.length && !request.inventoryItemIDs.length) {
+                return Promise.reject(new Error("Select at least one shipment or inventory impact explicitly"));
+            }
+            if (typeof request.cargo_value !== "number" || !Number.isFinite(request.cargo_value) || request.cargo_value <= 0) {
+                return Promise.reject(new Error("Cargo value must be a finite number greater than zero"));
+            }
+            if (typeof request.incident_id !== "string" || !request.incident_id.trim()) {
+                return Promise.reject(new Error("Incident ID is required"));
+            }
+
+            return postJSON("evaluateIncident", {
+                schemaVersion: 1,
+                feed_items: request.feed_items,
+                cargo_value: request.cargo_value,
+                incident_id: request.incident_id.trim(),
+                shipmentIDs: request.shipmentIDs.map(function (id) { return id.trim(); }),
+                inventoryItemIDs: request.inventoryItemIDs.map(function (id) { return id.trim(); })
+            });
         },
 
         /**
@@ -222,25 +332,10 @@ sap.ui.define([], function () {
 
         /** Calls decideRecommendation exactly as documented in docs/API.md. */
         decide: function (sRecommendationId, sDecision, sNote) {
-            return fetchCsrf().then(function (token) {
-                var headers = { "Content-Type": "application/json", Accept: "application/json" };
-                if (token) { headers["X-CSRF-Token"] = token; }
-                return fetch(SERVICE + "decideRecommendation", {
-                    method: "POST",
-                    headers: headers,
-                    credentials: "include",
-                    body: JSON.stringify({ recommendationID: sRecommendationId, decision: sDecision, decisionNote: sNote || null })
-                });
-            }).then(function (res) {
-                return res.json().catch(function () { return {}; }).then(function (body) {
-                    if (!res.ok) {
-                        var msg = (body && body.error && body.error.message) || ("HTTP " + res.status);
-                        var err = new Error(msg);
-                        err.status = res.status;
-                        throw err;
-                    }
-                    return body;   // { recommendationID, decision, executionStatus: "notExecuted" }
-                });
+            return postJSON("decideRecommendation", {
+                recommendationID: sRecommendationId,
+                decision: sDecision,
+                decisionNote: sNote || null
             });
         }
     };

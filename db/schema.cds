@@ -70,6 +70,7 @@ entity Recommendations : cuid, managed {
   tradeoffs      : LargeString;
   source         : RecommendationSource not null;
   approvalStatus : RecommendationApprovalStatus not null default #pending;
+  executionStatus: String not null default 'notExecuted';
   decidedBy      : String(120);
   decidedAt      : Timestamp;
   decisionNote   : String(500);

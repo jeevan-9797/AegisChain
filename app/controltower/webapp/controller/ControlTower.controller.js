@@ -5,12 +5,18 @@ sap.ui.define([
     "sap/m/Dialog",
     "sap/m/Button",
     "sap/m/TextArea",
+    "sap/m/MessageStrip",
+    "sap/m/Input",
+    "sap/m/Select",
+    "sap/m/Label",
+    "sap/m/VBox",
+    "sap/ui/core/Item",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
     "sap/ui/dom/includeScript",
     "sap/ui/dom/includeStylesheet",
     "com/aegis/controltower/model/BackendAdapter"
-], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, Filter, FilterOperator, includeScript, includeStylesheet, BackendAdapter) {
+], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, MessageStrip, Input, Select, Label, VBox, Item, Filter, FilterOperator, includeScript, includeStylesheet, BackendAdapter) {
     "use strict";
 
     // Leaflet (open-source map library) is loaded from a CDN - a "regular tool" fallback,
@@ -176,6 +182,254 @@ sap.ui.define([
             if (sQuery) { aFilters.push(new Filter("headline", FilterOperator.Contains, sQuery)); }
             if (sCat && sCat !== "All") { aFilters.push(new Filter("category", FilterOperator.EQ, sCat)); }
             this.byId("signalsTable").getBinding("items").filter(aFilters);
+        },
+
+        onCreateLiveIncident: function () {
+            if (!this._isLive()) { return; }
+            BackendAdapter.getImpactTargets().then(function (targets) {
+                this._openLiveIncidentDialog(targets);
+            }.bind(this)).catch(function (error) {
+                MessageBox.error("Could not load shipment and inventory impact choices: " + error.message);
+            });
+        },
+
+        onEvaluateIncidentWithML: function () {
+            if (!this._isLive()) { return; }
+            BackendAdapter.getImpactTargets().then(function (targets) {
+                this._openMlEvaluationDialog(targets);
+            }.bind(this)).catch(function (error) {
+                MessageBox.error("Could not load shipment and inventory impact choices: " + error.message);
+            });
+        },
+
+        _mlEvaluationErrorMessage: function (error) {
+            var message = String(error && error.message || "Unknown evaluation error");
+            var detail = message.toLowerCase();
+            if (error && error.status === 400) {
+                if (/feed_items/.test(detail)) { return "Enter a nonempty disruption feed item. No records were created."; }
+                if (/unknown (shipment|inventory item) id/.test(detail)) {
+                    return "A selected impact target no longer exists. Refresh the page and select it again. No records were created.";
+                }
+                if (/shipmentids|inventoryitemids|impact/.test(detail)) {
+                    return "Select at least one existing shipment or inventory item explicitly. No records were created.";
+                }
+                return "The evaluation request was rejected: " + message + ". No records were created.";
+            }
+            if (error && error.status === 422) {
+                if (/other or unsupported/.test(detail)) {
+                    return "ML classified the feed as OTHER or an unsupported category. No signal or recommendation was created.";
+                }
+                if (/multiple active disruptions/.test(detail)) {
+                    return "ML found multiple active disruptions. Evaluate one incident at a time; no records were created.";
+                }
+                if (/no active disruption/.test(detail)) {
+                    return "ML found no active moderate-or-higher disruption. No records were created.";
+                }
+                return "The evaluator could not create a recommendation from this feed: " + message + ". No records were created.";
+            }
+            return "Could not evaluate the incident: " + message + ". Refresh live data before retrying.";
+        },
+
+        _openMlEvaluationDialog: function (targets) {
+            function makeSelect(placeholder, values) {
+                var select = new Select({ width: "100%", selectedKey: "" });
+                select.addItem(new Item({ key: "", text: placeholder }));
+                values.forEach(function (value) {
+                    select.addItem(new Item({ key: value.key, text: value.text }));
+                });
+                return select;
+            }
+
+            var shipment = makeSelect("No shipment selected", targets.shipments.map(function (row) {
+                return { key: row.ID, text: row.shipmentNumber + " · " + row.origin + " → " + row.destination };
+            }));
+            var inventory = makeSelect("No inventory item selected", targets.inventoryItems.map(function (row) {
+                return { key: row.ID, text: row.materialNumber + " · " + row.description + " · " + row.location };
+            }));
+            var feed = new TextArea({
+                width: "100%", rows: 4, maxLength: 4000,
+                placeholder: "Paste one disruption alert or news item"
+            });
+            var cargoValue = new Input({ type: "Number", value: "450000" });
+            var incidentID = new Input({ value: "SAP-8842" });
+            var content = new VBox({ width: "100%", items: [
+                new MessageStrip({
+                    text: "Scenario economics use the SAP-8842 demonstration model; impact targets must be selected explicitly. Evaluation does not execute recovery actions.",
+                    type: "Information", showIcon: true
+                }),
+                new Label({ text: "Disruption feed item" }), feed,
+                new Label({ text: "Shipment impact (select explicitly)" }), shipment,
+                new Label({ text: "Inventory impact (select explicitly)" }), inventory,
+                new Label({ text: "Cargo value (USD)" }), cargoValue,
+                new Label({ text: "Incident ID" }), incidentID
+            ] });
+
+            var dialog;
+            var evaluateButton = new Button({
+                text: "Evaluate and create pending recommendation",
+                type: "Emphasized",
+                press: function () {
+                    var feedText = feed.getValue().trim();
+                    var shipmentID = shipment.getSelectedKey();
+                    var inventoryItemID = inventory.getSelectedKey();
+                    var cargo = Number(cargoValue.getValue());
+                    var incident = incidentID.getValue().trim();
+                    if (!feedText) {
+                        MessageBox.error("Enter one nonempty disruption feed item.");
+                        return;
+                    }
+                    if (!shipmentID && !inventoryItemID) {
+                        MessageBox.error("Select at least one existing shipment or inventory item explicitly.");
+                        return;
+                    }
+                    if (!Number.isFinite(cargo) || cargo <= 0 || !incident) {
+                        MessageBox.error("Enter a positive finite cargo value and an incident ID.");
+                        return;
+                    }
+
+                    evaluateButton.setEnabled(false);
+                    BackendAdapter.evaluateIncident({
+                        feed_items: [{ id: "UI-" + Date.now(), text: feedText }],
+                        cargo_value: cargo,
+                        incident_id: incident,
+                        shipmentIDs: shipmentID ? [shipmentID] : [],
+                        inventoryItemIDs: inventoryItemID ? [inventoryItemID] : []
+                    }).then(function (result) {
+                        dialog.close();
+                        return this._loadLive().then(function () {
+                            var summary = "ML created a " + result.category + " signal and linked pending recommendation."
+                                + "\nScenario: " + result.scenarioKey
+                                + "\nApproval: " + result.approvalStatus
+                                + " · Execution: " + result.executionStatus
+                                + "\nNo recovery action was executed.";
+                            if (this._isLive()) {
+                                MessageBox.success(summary);
+                            } else {
+                                MessageBox.warning("The records were created in CAP, but the live UI refresh failed. Refresh live data before evaluating again.\n\n" + summary);
+                            }
+                        }.bind(this));
+                    }.bind(this)).catch(function (error) {
+                        evaluateButton.setEnabled(true);
+                        MessageBox.error(this._mlEvaluationErrorMessage(error));
+                    }.bind(this));
+                }.bind(this)
+            });
+            dialog = new Dialog({
+                title: "Evaluate incident with ML",
+                contentWidth: "36rem",
+                content: [content],
+                beginButton: evaluateButton,
+                endButton: new Button({ text: "Cancel", press: function () { dialog.close(); } }),
+                afterClose: function () { dialog.destroy(); }
+            });
+            this.getView().addDependent(dialog);
+            dialog.open();
+        },
+
+        _openLiveIncidentDialog: function (targets) {
+            function makeSelect(placeholder, values) {
+                var select = new Select({ width: "100%", selectedKey: "" });
+                select.addItem(new Item({ key: "", text: placeholder }));
+                values.forEach(function (value) {
+                    select.addItem(new Item({ key: value.key, text: value.text }));
+                });
+                return select;
+            }
+
+            var type = makeSelect("Select a disruption type", [
+                { key: "Chokepoint", text: "Chokepoint" },
+                { key: "Port", text: "Port" },
+                { key: "Weather", text: "Weather" },
+                { key: "Tariff", text: "Tariff" }
+            ]);
+            var severity = makeSelect("Select severity", [
+                { key: "critical", text: "Critical" },
+                { key: "high", text: "High" },
+                { key: "medium", text: "Medium" },
+                { key: "low", text: "Low" }
+            ]);
+            var shipment = makeSelect("No shipment selected", targets.shipments.map(function (row) {
+                return { key: row.ID, text: row.shipmentNumber + " · " + row.origin + " → " + row.destination };
+            }));
+            var inventory = makeSelect("No inventory item selected", targets.inventoryItems.map(function (row) {
+                return { key: row.ID, text: row.materialNumber + " · " + row.description + " · " + row.location };
+            }));
+            var description = new Input({ maxLength: 500, placeholder: "Describe the disruption" });
+            var action = new Input({ maxLength: 500, placeholder: "Proposed recovery action" });
+            var rationale = new TextArea({ width: "100%", rows: 3, placeholder: "Why this fallback is proposed" });
+            var tradeoffs = new TextArea({ width: "100%", rows: 2, placeholder: "Known tradeoffs (optional)" });
+            var content = new VBox({ width: "100%", items: [
+                new Label({ text: "Disruption type" }), type,
+                new Label({ text: "Severity" }), severity,
+                new Label({ text: "Description" }), description,
+                new Label({ text: "Shipment impact (select explicitly)" }), shipment,
+                new Label({ text: "Inventory impact (select explicitly)" }), inventory,
+                new Label({ text: "Fallback recommendation action" }), action,
+                new Label({ text: "Rationale" }), rationale,
+                new Label({ text: "Tradeoffs" }), tradeoffs
+            ] });
+
+            var dialog;
+            var createButton = new Button({
+                text: "Create signal + pending recommendation",
+                type: "Emphasized",
+                press: function () {
+                    var shipmentID = shipment.getSelectedKey();
+                    var inventoryID = inventory.getSelectedKey();
+                    if (!type.getSelectedKey() || !severity.getSelectedKey() || !description.getValue().trim()) {
+                        MessageBox.error("Select a disruption type and severity, and enter a description.");
+                        return;
+                    }
+                    if (!shipmentID && !inventoryID) {
+                        MessageBox.error("Select at least one existing shipment or inventory impact.");
+                        return;
+                    }
+                    if (!action.getValue().trim() || !rationale.getValue().trim()) {
+                        MessageBox.error("Enter the fallback recommendation action and rationale.");
+                        return;
+                    }
+
+                    createButton.setEnabled(false);
+                    BackendAdapter.createIncident({
+                        type: type.getSelectedKey(),
+                        description: description.getValue().trim(),
+                        occurredAt: new Date().toISOString(),
+                        severity: severity.getSelectedKey(),
+                        shipmentImpacts: shipmentID ? [{ shipment_ID: shipmentID }] : [],
+                        inventoryImpacts: inventoryID ? [{ inventoryItem_ID: inventoryID }] : []
+                    }, {
+                        action: action.getValue().trim(),
+                        rationale: rationale.getValue().trim(),
+                        tradeoffs: tradeoffs.getValue().trim() || null
+                    }).then(function () {
+                        dialog.close();
+                        return this._loadLive().then(function () {
+                            MessageToast.show("Signal and pending fallback recommendation saved in CAP");
+                        });
+                    }.bind(this)).catch(function (error) {
+                        if (error.signalPersisted && error.signalID) {
+                            createButton.setEnabled(false);
+                            dialog.close();
+                            this._loadLive().then(function () {
+                                MessageBox.error(error.message + ". This form was closed to avoid creating a duplicate signal.");
+                            });
+                            return;
+                        }
+                        createButton.setEnabled(true);
+                        MessageBox.error("Could not create the live incident: " + error.message);
+                    }.bind(this));
+                }.bind(this)
+            });
+            dialog = new Dialog({
+                title: "Create live demo disruption",
+                contentWidth: "34rem",
+                content: [content],
+                beginButton: createButton,
+                endButton: new Button({ text: "Cancel", press: function () { dialog.close(); } }),
+                afterClose: function () { dialog.destroy(); }
+            });
+            this.getView().addDependent(dialog);
+            dialog.open();
         },
 
         onConfirmSignal: function (oEvent) {

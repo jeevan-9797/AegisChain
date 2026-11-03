@@ -113,6 +113,68 @@ and feed-entry validation remains in `run_incident_evaluation()`.
 This CLI is the Python-side protocol only. A CAP process adapter, timeout and
 process management, response validation, and CAP persistence remain future work.
 
+## Standalone HTTP service prototype
+
+`ml.http_service` exposes the same evaluator request and response over HTTP. It
+uses only the Python standard library for HTTP and does not persist CAP records.
+Run locally from the repository root:
+
+```bash
+python -m pip install -r requirements.txt
+python -m ml.http_service
+```
+
+The service listens on `HOST` (default `127.0.0.1` locally and `0.0.0.0` when
+running under Cloud Foundry) and `PORT` (default `8082`, Cloud Foundry supplies
+`PORT`). It provides `GET /healthz`, `GET /readyz`, and
+`POST /internal/v1/evaluate`. The POST body is the same exact `schemaVersion: 1`
+envelope described above; the response is the evaluator's existing JSON result.
+Errors use `{ "error": { "code": "...", "message": "..." } }`. Invalid
+JSON/envelopes return 400, evaluator input validation returns 422, oversized
+requests return 413, evaluator failures return a generic 500, and a full
+two-request evaluation capacity returns 503. The service never emits stack
+traces or evaluator exception details for unexpected failures.
+
+`runtime.txt` declares `python-3.13.x`, a runtime listed for the SAP BTP Cloud
+Foundry Python buildpack. A future standalone CF app manifest must set the
+command to `python -m ml.http_service`. The checked-in `requirements.txt` pins
+NumPy, scikit-learn, and their runtime dependency set to the versions verified
+in the available local Python 3.14 environment. Python 3.13 installation still
+needs to be confirmed in the target buildpack/space.
+
+The evaluator endpoint requires a shared bearer secret injected out of band.
+Set `AEGISCHAIN_EVALUATOR_TOKEN` on the Python service and the same value as
+`AEGISCHAIN_ML_TOKEN` on CAP. Both require at least 32 UTF-8 bytes and reject
+line breaks. Generate a random secret and use the platform's secret/environment binding
+mechanism rather than storing it in source, deployment descriptors, or logs.
+The evaluator compares tokens in constant time and does not log authorization
+headers. `GET /healthz` and `GET /readyz` remain public for platform health
+probes and reveal only generic status; only `POST /internal/v1/evaluate` is
+authenticated. CAP requires HTTPS for remote evaluator URLs except loopback
+URLs used for local development. Keep the service route private as an additional
+network control.
+
+This is an isolated shared-secret seam, not OAuth/XSUAA integration. The repo
+does not yet contain XSUAA service configuration, scopes, or a deployed CF
+binding. Replace or front this seam with OAuth2 client credentials once the
+team selects and provisions that BTP setup; CAP's remote adapter is the
+outbound credential attachment point.
+
+CAP remains in local subprocess mode by default. To explicitly select the HTTP
+service, configure CAP with:
+
+```text
+AEGISCHAIN_ML_MODE=remote
+AEGISCHAIN_ML_URL=https://<private-evaluator-route>/internal/v1/evaluate
+AEGISCHAIN_ML_TOKEN=<same-secret-injected-into-evaluator>
+AEGISCHAIN_ML_TIMEOUT_MS=15000
+```
+
+Remote mode fails during CAP service initialization if the URL is missing or
+invalid; it never falls back to Python subprocess execution. The same timeout
+setting applies to local and remote evaluation. CAP continues to validate
+shipment/inventory IDs and owns all record creation and approval state.
+
 ---
 
 ## 5. Transitioning to SAP Generative AI Hub
