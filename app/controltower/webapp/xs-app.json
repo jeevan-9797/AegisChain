@@ -7,7 +7,7 @@
       "target": "/odata/v4/aegis/$1",
       "destination": "aegischain-srv-api",
       "authenticationType": "xsuaa",
-      "csrfProtection": false
+      "csrfProtection": true
     },
     {
       "source": "^(.*)$",

@@ -18,6 +18,18 @@
   },
   "cds": {
     "requires": {
+      "auth": {
+        "users": {
+          "approver": {
+            "roles": [
+              "Approver"
+            ]
+          },
+          "viewer": {
+            "roles": []
+          }
+        }
+      },
       "[production]": {
         "db": "hana",
         "auth": "xsuaa"

@@ -6,13 +6,22 @@ const port = 43100 + Math.floor(Math.random() * 1000)
 const base = `http://127.0.0.1:${port}/odata/v4/aegis`
 let server
 
-async function request(path, method = 'GET', body) {
+function authHeader(user) {
+  return user ? `Basic ${Buffer.from(`${user}:`).toString('base64')}` : undefined
+}
+
+async function request(path, method = 'GET', body, user = 'approver') {
+  const headers = {}
+  if (body) headers['content-type'] = 'application/json'
+  const auth = authHeader(user)
+  if (auth) headers['authorization'] = auth
   const response = await fetch(`${base}/${path}`, {
     method,
-    headers: body ? { 'content-type': 'application/json' } : {},
+    headers,
     body: body && JSON.stringify(body)
   })
-  const json = await response.json()
+  let json
+  try { json = await response.json() } catch { json = null }
   return { response, json }
 }
 
@@ -25,7 +34,9 @@ before(async () => {
   for (let i = 0; i < 50; i++) {
     if (server.exitCode !== null) throw new Error(`CAP server exited with ${server.exitCode}`)
     try {
-      const response = await fetch(`${base}/Shipments`)
+      const response = await fetch(`${base}/Shipments`, {
+        headers: { authorization: `Basic ${Buffer.from('approver:').toString('base64')}` }
+      })
       if (response.ok) return
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 200))
@@ -206,6 +217,31 @@ test('creates recommendations and allows one approval or rejection without execu
   }
 })
 
+
+test('restricts decideRecommendation to Approver: viewer returns 403, approver returns 200', async () => {
+  const signals = await request('DisruptionSignals?$expand=shipmentImpacts')
+  const signalID = signals.json.value.find(signal => signal.shipmentImpacts?.length)?.ID
+  assert.ok(signalID)
+
+  const created = await request('Recommendations', 'POST', {
+    signal_ID: signalID, action: 'Route verification for auth test', rationale: 'Auth scope test',
+    source: 'fallback'
+  })
+  assert.equal(created.response.status, 201)
+
+  // Viewer without Approver role -> 403 Forbidden
+  const forbidden = await request('decideRecommendation', 'POST', {
+    recommendationID: created.json.ID, decision: 'approved', decisionNote: 'Should fail'
+  }, 'viewer')
+  assert.equal(forbidden.response.status, 403)
+
+  // Approver with Approver role -> 200 OK
+  const allowed = await request('decideRecommendation', 'POST', {
+    recommendationID: created.json.ID, decision: 'approved', decisionNote: 'Approved by authorized user'
+  }, 'approver')
+  assert.equal(allowed.response.status, 200)
+  assert.equal(allowed.json.decision, 'approved')
+})
 test('evaluateIncident rejects empty feeds and unknown explicit IDs before starting ML', async () => {
   const emptyFeed = await request('evaluateIncident', 'POST', {
     schemaVersion: 1, feed_items: [], cargo_value: 450000, incident_id: 'SAP-8842',

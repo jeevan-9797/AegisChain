@@ -44,3 +44,7 @@ service AegisService @(path: '/odata/v4/aegis') {
     executionStatus   : String(30);
   };
 }
+
+
+annotate AegisService with @(requires: 'authenticated-user');
+annotate AegisService.decideRecommendation with @(requires: 'Approver');
