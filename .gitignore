@@ -23,3 +23,5 @@ __pycache__/
 *.sqlite
 .DS_Store
 @cds-models
+
+resources/

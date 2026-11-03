@@ -1,0 +1,158 @@
+_schema-version: 3.3.0
+ID: aegischain
+version: 1.0.0
+description: "AegisChain - AI-assisted Supply Chain Resilience Control Tower"
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+  # CAP Node.js Backend Service
+  - name: aegischain-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 512M
+      disk-quota: 512M
+      readiness-health-check-type: http
+      readiness-health-check-http-endpoint: /
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: aegischain-db
+      - name: aegischain-auth
+      - name: aegischain-destination
+
+  # SAP HANA Database Deployer
+  - name: aegischain-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 512M
+    requires:
+      - name: aegischain-db
+
+  # SAP UI5 Control Tower Frontend Build
+  - name: controltower
+    type: html5
+    path: app/controltower
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build
+      supported-platforms: []
+
+  # HTML5 Application Repository Content Deployer
+  - name: aegischain-app-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: aegischain-html5-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: controltower
+          artifacts:
+            - controltower.zip
+          target-path: resources/
+
+  # Destination Service Content (SAP Build Work Zone & Backend Routes)
+  - name: aegischain-destinations
+    type: com.sap.application.content
+    requires:
+      - name: aegischain-auth
+        parameters:
+          service-key:
+            name: aegischain-auth-key
+      - name: aegischain-html5-repo-host
+        parameters:
+          service-key:
+            name: aegischain-html5-repo-host-key
+      - name: srv-api
+      - name: aegischain-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            - Name: aegischain-html5-repository
+              ServiceInstanceName: aegischain-html5-repo-host
+              ServiceKeyName: aegischain-html5-repo-host-key
+              sap.cloud.service: aegischain.service
+            - Name: aegischain-auth
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: aegischain-auth
+              ServiceKeyName: aegischain-auth-key
+              sap.cloud.service: aegischain.service
+            - Name: aegischain-srv-api
+              URL: ~{srv-api/srv-url}
+              Authentication: NoAuthentication
+              Type: HTTP
+              ProxyType: Internet
+              HTML5.ForwardAuthToken: true
+              HTML5.DynamicDestination: true
+              sap.cloud.service: aegischain.service
+
+resources:
+  # SAP HANA Cloud HDI Container
+  - name: aegischain-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+
+  # SAP XSUAA Authentication Service
+  - name: aegischain-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: aegischain-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+
+  # SAP Destination Service (lite plan with HTML5 Runtime enabled)
+  - name: aegischain-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+    requires:
+      - name: srv-api
+
+  # SAP HTML5 Application Repository (app-host plan)
+  - name: aegischain-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host

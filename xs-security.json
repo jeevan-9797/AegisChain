@@ -1,0 +1,95 @@
+{
+  "xsappname": "aegischain",
+  "tenant-mode": "dedicated",
+  "description": "Security descriptor for AegisChain",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Viewer",
+      "description": "View AegisChain disruption signals, recommendations, shipments, and inventory"
+    },
+    {
+      "name": "$XSAPPNAME.Operator",
+      "description": "Trigger disruption evaluations and create disruption signals in AegisChain"
+    },
+    {
+      "name": "$XSAPPNAME.Approver",
+      "description": "Approve or reject recovery recommendations in AegisChain"
+    },
+    {
+      "name": "$XSAPPNAME.Admin",
+      "description": "Full administrative access to AegisChain"
+    }
+  ],
+  "attributes": [],
+  "role-templates": [
+    {
+      "name": "Viewer",
+      "description": "View AegisChain supply chain operational data",
+      "scope-references": [
+        "$XSAPPNAME.Viewer"
+      ]
+    },
+    {
+      "name": "Operator",
+      "description": "Trigger disruption evaluations and create disruption signals",
+      "scope-references": [
+        "$XSAPPNAME.Operator"
+      ]
+    },
+    {
+      "name": "Approver",
+      "description": "Approve or reject recovery recommendations",
+      "scope-references": [
+        "$XSAPPNAME.Approver"
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "AegisChain administrator",
+      "scope-references": [
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "AegisChain_Viewer",
+      "description": "AegisChain Read-Only Viewer Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer"
+      ]
+    },
+    {
+      "name": "AegisChain_Operator",
+      "description": "AegisChain Operator Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.Operator"
+      ]
+    },
+    {
+      "name": "AegisChain_Approver",
+      "description": "AegisChain Approver Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.Approver"
+      ]
+    },
+    {
+      "name": "AegisChain_Admin",
+      "description": "AegisChain Administrator Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.Operator",
+        "$XSAPPNAME.Approver",
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "credential-types": [
+      "binding-secret",
+      "x509"
+    ]
+  }
+}

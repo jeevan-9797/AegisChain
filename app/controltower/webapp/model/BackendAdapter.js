@@ -15,7 +15,11 @@
 sap.ui.define([], function () {
     "use strict";
 
-    var SERVICE = "/odata/v4/aegis/";
+    var base = (typeof sap !== "undefined" && sap.ui && typeof sap.ui.require === "function" && typeof sap.ui.require.toUrl === "function")
+        ? sap.ui.require.toUrl("com/aegis/controltower")
+        : "";
+    if (base === ".") { base = ""; }
+    var SERVICE = (base ? base + "/" : "/") + "odata/v4/aegis/";
     var STORAGE_KEY = "aegis.dataMode";
 
     var SEVERITY = {
