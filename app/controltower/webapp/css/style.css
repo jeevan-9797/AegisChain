@@ -1,0 +1,31 @@
+/* AegisChain - small additions on top of the SAP Horizon theme */
+
+/* Map box size */
+.aegisMap {
+    height: 440px;
+    width: 100%;
+    border-radius: 8px;
+}
+
+/* Card look for lists, tables and panels */
+.aegisCard {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #D9DEE3;
+}
+
+/* Projector readability: never smaller than 14px */
+.aegisPage .sapMText,
+.aegisPage .sapMLabel,
+.aegisPage .sapMObjStatusText {
+    font-size: 0.875rem;
+}
+
+/* Approve / Reject bar at the bottom of the Incidents tab */
+.aegisActionBar {
+    border-radius: 12px;
+    border: 1px solid #D9DEE3;
+    background: #FFFFFF;
+    padding: 0 1rem;
+    height: 3.5rem;
+}

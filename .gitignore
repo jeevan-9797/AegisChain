@@ -1,19 +1,25 @@
 node_modules/
+dist/
 target/
 _out/
 gen/
-
-.cdsrc-private.json
-default-*.json
-*.sqlite
-
-# MTA
+.gen/
 mta_archives/
 *_mta_build_tmp
 *.mtar
-
-# Other
+.env
+*.env
+default-env.json
+default-*.json
+.cdsrc-private.json
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.sqlite
 .DS_Store
-
-# @cap-js/cds-typer
 @cds-models

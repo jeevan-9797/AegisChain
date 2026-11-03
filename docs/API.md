@@ -28,7 +28,9 @@ Shipment and inventory records include `dataSource: "mockS4HANA"` to identify de
 
 ## Create a disruption signal and its impacts
 
-`POST /DisruptionSignals` accepts a CAP deep insert. A signal must include its type, description, occurrence timestamp, severity/classification, source `demoScenario`, and at least one existing shipment or inventory impact. The service does not infer which records a signal affects; the caller supplies the links. Type and severity remain open strings.
+`POST /DisruptionSignals` accepts a CAP deep insert. A manually entered signal uses source `demoScenario`; it must include its type, description, occurrence timestamp, severity/classification, and at least one existing shipment or inventory impact. The service does not infer which records a signal affects; the caller supplies the links. Type and severity remain open strings.
+
+The required signal fields must be nonblank. Every impact link must contain an explicit `shipment_ID` or `inventoryItem_ID` that exists in the corresponding CAP entity; duplicate links within either impact collection are rejected. Missing, duplicate, or unknown impact IDs return `400 Bad Request`.
 
 ```json
 {
@@ -51,6 +53,54 @@ A successful create returns `201 Created` and the signal representation, includi
 ## Create an advisory recommendation
 
 `POST /Recommendations` creates a recommendation linked to an existing signal. Required fields are `signal_ID`, `action`, `rationale`, and `source` (`ai` or `fallback`). `tradeoffs` is optional. New recommendations always start as `pending`; decision fields are cleared by the service. Supplying another approval status returns `400 Bad Request`.
+
+Required recommendation fields must be nonblank, and `signal_ID` must identify an existing signal. If the signal is created but recommendation creation fails, the signal remains persisted; clients should report its ID and must not silently retry the whole creation flow.
+
+Every created recommendation stores `executionStatus: "notExecuted"`. Other execution states are rejected; approval and rejection only update the decision fields.
+
+## Evaluate a disruption feed and persist one advisory recommendation
+
+The OData action POST /evaluateIncident runs the Python evaluator through the configured local subprocess or authenticated remote HTTP adapter, maps its result, then writes one signal, its explicit impact links, and one linked pending recommendation in a single CAP deep insert. CAP classification remains deterministic; the evaluator may attach an optional LLM-generated briefing when credentials are configured.
+
+Example request:
+
+```json
+{
+  "schemaVersion": 1,
+  "feed_items": [
+    {
+      "id": "SIG-8842-01",
+      "text": "Houthi missile barrage strikes a vessel off Bab el-Mandeb."
+    }
+  ],
+  "cargo_value": 450000,
+  "incident_id": "SAP-8842",
+  "shipmentIDs": ["<existing shipment UUID>"],
+  "inventoryItemIDs": []
+}
+```
+
+Successful response (`200 OK`):
+
+```json
+{
+  "signalID": "<created signal UUID>",
+  "recommendationID": "<created recommendation UUID>",
+  "category": "Chokepoint",
+  "severity": "critical",
+  "scenarioKey": "OPTION_C_SPLIT",
+  "approvalStatus": "pending",
+  "executionStatus": "notExecuted"
+}
+```
+
+Mapping rules: `CHOKEPOINT`, `PORT`, `TARIFF`, and `WEATHER` become the UI categories `Chokepoint`, `Port`, `Tariff`, and `Weather`. Evaluator severities 3/2/1 become CAP/UI `critical`/`medium`/`low`; only active signals at severity 2 or 3 can produce a recommendation. The signal source is `mlEvaluation`. The recommendation source is `fallback`, because the integrated evaluator runs its deterministic Gate 1 implementation. Its action names the evaluator's selected scenario; rationale and tradeoffs retain evaluator output.
+
+An empty feed is rejected with `400`. `OTHER` or otherwise unsupported-only classifications, multiple active classifications in one request, and feeds with no active moderate-or-higher disruption are rejected with `422`; none creates CAP records. Invalid impact IDs return `400`. In local mode, missing Python returns `503`, evaluator timeout returns `504`, and process/schema failures return `502`. CAP uses local subprocess mode by default (`AEGISCHAIN_ML_MODE=local`); set `AEGISCHAIN_PYTHON` to the Python executable and optionally `AEGISCHAIN_ML_TIMEOUT_MS` to the timeout in milliseconds. To explicitly select the HTTP prototype, configure `AEGISCHAIN_ML_MODE=remote`, `AEGISCHAIN_ML_URL` to the evaluator's full `/internal/v1/evaluate` endpoint, and `AEGISCHAIN_ML_TOKEN` to the injected shared bearer secret. Missing or weak remote credentials fail CAP initialization; CAP never falls back to subprocess mode. Remote errors map connection failures to `503`, timeouts to `504`, invalid evaluator requests (`400`/`422`) to CAP `400`, authentication rejection (`401`/`403`) to `502`, and other upstream or response failures to `502`. Install the pinned Python runtime dependencies from `requirements.txt` before using either mode.
+
+The Python evaluator requires the same secret in `AEGISCHAIN_EVALUATOR_TOKEN`; secrets must be at least 32 UTF-8 bytes and must be injected outside source control. `GET /healthz` and `GET /readyz` are public and return only generic status for platform probes; `POST /internal/v1/evaluate` requires `Authorization: Bearer <token>`. CAP requires HTTPS for non-loopback evaluator URLs to protect the bearer credential in transit. Remote mode requires Node.js 18 or newer for the built-in Fetch API. Python accepts only the versioned evaluator envelope and does not receive CAP shipment or inventory IDs.
+
+This first integration persists one supported active classification per request. Submit separate calls for separate active incidents. The evaluator's scenario model is the documented SAP-8842 demonstration model; its economics are not shipment-specific merely because caller-supplied impact IDs are attached. Evaluation, creation, approval, and rejection never execute recovery actions or write to external SAP systems. The existing frontend manual live creation flow and mock mode are unchanged.
 
 Approval decisions are recorded on the recommendation (`approvalStatus`, `decidedBy`, `decidedAt`, and optional `decisionNote`). There is one decision per recommendation; a separate decision history resource is not provided.
 
@@ -83,7 +133,7 @@ Direct `PATCH`/`PUT` updates to `/Recommendations` are rejected with `405 Method
 ## Current boundaries
 
 - The API provides mock S/4HANA operational records only. It does not read from or write to a live SAP system.
-- Recommendation creation stores caller-provided advisory content; there is no AI provider or deterministic recommendation generator in this backend phase.
+- Manual recommendation creation stores caller-provided advisory content. The evaluateIncident action creates its advisory recommendation from the evaluator scenario. The upstream LLM additions can classify or generate a briefing only when explicitly selected/configured; the CAP action currently uses deterministic classification. Neither path executes actions.
 - The decision actor is the CAP request user under local mocked authentication. Production identity, authorization, and approver roles are not configured.
 - No BPA workflow is invoked, and `executionStatus: "notExecuted"` is not an execution tracker.
 - Data in the local in-memory SQLite database is lost when the server stops.
