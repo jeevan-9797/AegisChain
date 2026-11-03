@@ -76,54 +76,42 @@ AegisChain/ml/
 
 ---
 
-## 4. SAP CAP / Node.js Integration Pattern
+## 4. Standalone Python CLI Protocol
 
-The SAP CAP backend executes evaluations via a clean Node.js child process wrapper or local microservice endpoint.
+`ml.cli` provides a versioned JSON stdin/stdout boundary around the existing
+`run_incident_evaluation()` function. It does not change evaluator behavior or
+persist CAP records. The protocol intentionally contains no CAP shipment or
+inventory IDs.
 
-### Node.js / CAP Service Implementation (`srv/incident-service.js`)
+Run it from the repository root:
 
-```javascript
-const { spawn } = require('child_process');
-const path = require('path');
-
-/**
- * Invokes the local AegisChain predictive ML engine.
- * @param {Array<Object>} feedItems - Unstructured news or IoT alerts
- * @param {number} cargoValueUsd - Consignment invoice value (default: 450000)
- * @returns {Promise<Object>} Formatted evaluation payload
- */
-function evaluateIncidentML(feedItems, cargoValueUsd = 450000.0) {
-  return new Promise((resolve, reject) => {
-    const pythonPath = process.env.PYTHON_PATH || 'python';
-    const scriptPath = path.resolve(__dirname, '../ml/engine.py');
-
-    const pyProcess = spawn(pythonPath, [scriptPath, '-']);
-    let stdoutData = '';
-    let stderrData = '';
-
-    pyProcess.stdout.on('data', (chunk) => { stdoutData += chunk; });
-    pyProcess.stderr.on('data', (chunk) => { stderrData += chunk; });
-
-    pyProcess.on('close', (code) => {
-      if (code !== 0) {
-        return reject(new Error(`ML Engine failed (code ${code}): ${stderrData}`));
-      }
-      try {
-        const payload = JSON.parse(stdoutData);
-        resolve(payload);
-      } catch (err) {
-        reject(new Error(`Failed to parse ML JSON payload: ${err.message}`));
-      }
-    });
-
-    // Stream input feed items as JSON via stdin
-    pyProcess.stdin.write(JSON.stringify(feedItems));
-    pyProcess.stdin.end();
-  });
-}
-
-module.exports = { evaluateIncidentML };
+```bash
+python -m ml.cli < request.json
 ```
+
+The input must be one JSON object with exactly these fields:
+
+```json
+{
+  "schemaVersion": 1,
+  "feed_items": [
+    {
+      "id": "SIG-8842-01",
+      "text": "Houthi missile barrage strikes a vessel off Bab el-Mandeb."
+    }
+  ],
+  "cargo_value": 450000,
+  "incident_id": "SAP-8842"
+}
+```
+
+On success, stdout contains one JSON line with the evaluator's existing result.
+Invalid envelopes and evaluator failures write diagnostics to stderr and exit
+nonzero; empty stdin never triggers the engine's built-in sample feed. Cargo
+and feed-entry validation remains in `run_incident_evaluation()`.
+
+This CLI is the Python-side protocol only. A CAP process adapter, timeout and
+process management, response validation, and CAP persistence remain future work.
 
 ---
 
