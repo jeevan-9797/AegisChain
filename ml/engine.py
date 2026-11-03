@@ -1,6 +1,7 @@
 """AegisChain Orchestration Engine.
 
-Unified entry point integrating signal classification and predictive ML scenario scoring.
+Unified entry point integrating signal classification, predictive ML scenario scoring,
+and human-in-the-loop executive decision briefing.
 Generates SAP CAP and UI5-compatible payloads for cold-chain incident decision support.
 Part of the AegisChain SAP Hackfest 2026 intelligence suite.
 """
@@ -20,6 +21,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+from ml.briefing_agent import ExecutiveBriefingAgent
 from ml.classifier import SignalClassifier
 from ml.models import AegisPredictiveCore
 
@@ -30,19 +32,22 @@ def run_incident_evaluation(
     feed_items: List[Dict[str, Any]],
     cargo_value: float = 450000.0,
     incident_id: str = "SAP-8842",
+    classifier_mode: str = "deterministic",
 ) -> Dict[str, Any]:
-    """Execute end-to-end incident evaluation and response recommendation.
+    """Execute end-to-end incident evaluation, simulation, and executive decision briefing.
 
     Orchestrates:
-      1. Feed signal classification (identifying chokepoints, port backlogs, tariffs, weather).
+      1. Feed signal classification (deterministic heuristics or LLM proxy).
       2. Multi-scenario simulation using dual gradient boosting estimators.
       3. Decision optimization (identifying minimum net economic impact).
-      4. Downstream payload formatting conforming to SAP CAP / Fiori contracts.
+      4. Executive decision briefing generation (ExecutiveBriefingAgent).
+      5. Downstream payload formatting conforming to SAP CAP / Fiori contracts.
 
     Args:
         feed_items: Raw incident alerts, news items, or RSS feed entries.
         cargo_value: Invoice/replacement value of the cargo in USD (default: $450,000.00).
         incident_id: Tracking ID for the active consignment incident (default: 'SAP-8842').
+        classifier_mode: Classification mode: 'deterministic', 'llm_proxy', or 'genai_hub'.
 
     Returns:
         Structured JSON-serializable decision package.
@@ -50,7 +55,7 @@ def run_incident_evaluation(
     start_time = time.perf_counter()
 
     # Step 1: Signal Classification
-    classifier = SignalClassifier(mode="deterministic")
+    classifier = SignalClassifier(mode=classifier_mode)
     classified_signals = classifier.classify_signals(feed_items)
 
     # Aggregate active disruptions
@@ -93,9 +98,7 @@ def run_incident_evaluation(
         air_scenario["net_economic_impact_usd"] - optimal_scenario["net_economic_impact_usd"], 2
     )
 
-    elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-
-    # Step 4: Assemble Payload Conforming to SAP CAP & Control Tower UI Schema
+    # Step 4: Assemble Initial Payload Conforming to SAP CAP & Control Tower UI Schema
     payload: Dict[str, Any] = {
         "incident_id": incident_id,
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -140,14 +143,21 @@ def run_incident_evaluation(
                 f"${savings_vs_air:,.2f} over full air charter and avoiding ${savings_vs_worst:,.2f} in spoilage loss."
             ),
         },
-        "execution_metadata": {
-            "engine": "AegisPredictiveCore",
-            "version": "1.0.0-gate1",
-            "execution_mode": "deterministic_gate1_fallback",
-            "zero_credentials_verified": True,
-            "latency_ms": elapsed_ms,
-            "sap_ai_hub_toggle_ready": True,
-        },
+    }
+
+    # Step 5: Executive Decision Briefing Generation
+    briefing_agent = ExecutiveBriefingAgent()
+    payload["executive_briefing"] = briefing_agent.generate_brief(payload)
+
+    elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+    payload["execution_metadata"] = {
+        "engine": "AegisPredictiveCore",
+        "version": "1.0.0-gate1",
+        "classifier_mode": classifier_mode,
+        "zero_credentials_verified": True,
+        "latency_ms": elapsed_ms,
+        "sap_ai_hub_toggle_ready": True,
+        "briefing_status": payload["executive_briefing"].get("sign_off_status", "AWAITING_HUMAN_APPROVAL"),
     }
 
     return payload

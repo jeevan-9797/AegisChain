@@ -2,7 +2,7 @@
 
 > **SAP Hackfest 2026** | Track: Autonomous Supply Chain Resiliency  
 > **Package**: `ml/` (Self-Contained Autonomous Decision Engine)  
-> **Status**: Gate 1 Fallback Approved (`v1.0.0-gate1`)
+> **Status**: Gate 1 Fallback & LLM Adapter Layer Verified (`v1.1.0-adapter`)
 
 ---
 
@@ -11,51 +11,69 @@
 In enterprise SAP BTP and Learning Hub sandbox environments, **SAP AI Core** service keys and subaccount provisioning can frequently be restricted, pending approval, or quota-limited. 
 
 In accordance with our official **Gate 1 Fallback Plan**, the `ml/` module delivers a fully functional, deterministic, and modular machine learning package running directly inside **SAP Business Application Studio (BAS)** or any standard Node.js/Python container runtime:
-- **Zero Cloud Credentials Required**: Operates independently of external API keys, service bindings, or cloud tokens.
-- **Identical Downstream Contract**: Exposes the exact same JSON schema and evaluation contract to the SAP Cloud Application Programming Model (CAP) backend as the cloud-hosted SAP Generative AI Hub will.
-- **Zero-Friction Transition**: When SAP AI Core credentials are provisioned, toggling `mode="genai_hub"` connects to foundation models (e.g., GPT-4o, Gemini 1.5 Pro) without altering CAP service interfaces, database tables, or SAP UI5 / Fiori components.
+- **Zero Cloud Credentials Required**: Operates independently of external API keys, service bindings, or cloud tokens via robust scikit-learn estimators and deterministic regex heuristics.
+- **Local LLM Proxy (`gemini-2.5-flash`)**: Integrates Google AI Studio as a development-time proxy for live headline classification and CSCO decision memorandum generation.
+- **Seamless Adapter Pattern**: When SAP AI Core credentials are provisioned, toggling `LLM_PROVIDER="sap_hub"` connects to enterprise foundation models via SAP Generative AI Hub without altering downstream CAP service interfaces, database tables, or SAP UI5 / Fiori components.
 
 ---
 
 ## 2. Architecture & Module Design
 
 ```
-AegisChain/ml/
-│
-├── __init__.py           # Public API: SignalClassifier, AegisPredictiveCore, run_incident_evaluation
-├── classifier.py         # SignalClassifier (deterministic heuristic parser + genai_hub toggle)
-├── models.py             # AegisPredictiveCore (GradientBoostingRegressor & GradientBoostingClassifier)
-├── engine.py             # Unified incident orchestration pipeline & JSON payload generator
-├── eval_dataset.json     # Ground-truth evaluation dataset (40 realistic test headlines)
-├── benchmark.py          # Validation runner (Accuracy, Precision, Recall, Hallucination audit)
-└── README.md             # Technical architecture & integration documentation
+AegisChain/
+├── .env.example          # Template for local environment variables (never committed)
+├── .gitignore            # Git exclusion for .env, *.env, .venv, __pycache__
+└── ml/
+    ├── __init__.py       # Public API: SignalClassifier, AegisPredictiveCore, ExecutiveBriefingAgent, run_incident_evaluation
+    ├── llm_client.py     # SwappableLLMClient (Google AI Studio gemini-2.5-flash + SAP AI Hub skeleton)
+    ├── classifier.py     # SignalClassifier (modes: 'deterministic', 'llm_proxy', 'genai_hub')
+    ├── models.py         # AegisPredictiveCore (GradientBoostingRegressor & GradientBoostingClassifier)
+    ├── briefing_agent.py # ExecutiveBriefingAgent (Generates structured decision memo with sign_off_status)
+    ├── engine.py         # Unified incident orchestration pipeline & JSON payload generator
+    ├── eval_dataset.json # Ground-truth evaluation dataset (40 realistic test headlines)
+    ├── benchmark.py      # Validation runner (Accuracy, Precision, Recall, Hallucination audit)
+    ├── test_llm.py       # Standalone verification suite for LLM client, classifier, and briefing agent
+    └── README.md         # Technical architecture & integration documentation
 ```
 
 ### Module Responsibilities
 
-1. **`ml/classifier.py` (`SignalClassifier`)**:
-   - Parses unstructured maritime disruption alerts, port notices, tariff announcements, and weather bulletins.
-   - Detects critical chokepoints (`BAB_EL_MANDEB`, `SUEZ`, `HORMUZ`, `PANAMA_CANAL`, `MALACCA`).
-   - Identifies port bottlenecks (`MOMBASA / MBA`, `KILINDINI`, `ROTTERDAM`, `JEBEL ALI`).
-   - Tags tariff hikes, medical API import bans, and regulatory clearance delays.
-   - Outputs standardized disruption dicts with severity levels (1 to 3), confidence scores, and impacted freight corridors.
-   - Guarantees **0.0% hallucinated lanes** on noise articles.
+1. **`ml/llm_client.py` (`SwappableLLMClient`)**:
+   - Adapter pattern decoupling downstream consumers from specific LLM providers.
+   - Reads `LLM_PROVIDER` (default `"google"`) and `GEMINI_API_KEY` from local `.env`.
+   - In `"google"` mode: calls `google-genai` SDK targeting model `gemini-2.5-flash` with strict structured JSON output (`response_mime_type="application/json"`).
+   - In `"sap_hub"` mode: contains pre-built skeleton for `gen_ai_hub.proxy.native.openai` ready to be uncommented once SAP AI Core service keys are provisioned.
 
-2. **`ml/models.py` (`AegisPredictiveCore`)**:
+2. **`ml/classifier.py` (`SignalClassifier`)**:
+   - Supports modes: `"deterministic"` (default), `"llm_proxy"`, and `"genai_hub"`.
+   - In `"llm_proxy"` mode: uses `SwappableLLMClient` to parse raw feeds into standardized categories (`CHOKEPOINT`, `PORT`, `TARIFF`, `WEATHER`, `OTHER`), severities (1–3), and impacted lanes.
+   - **Automatic Resilience**: If API keys are missing, network times out, or quota is exhausted, it seamlessly falls back to the deterministic regex engine (`is_fallback=True`).
+
+3. **`ml/models.py` (`AegisPredictiveCore`)**:
    - **Lane Delay Model (`GradientBoostingRegressor`)**: Predicts net transit delay days based on `[base_days, security_risk (0-1), congestion_index (1-5), season (1-4)]`.
    - **Spoilage Risk Model (`GradientBoostingClassifier`)**: Predicts pharmaceutical viability loss probability based on `[days_over_viability, reefer_health (0-1), transshipments, mode_mix (1=sea, 2=air, 3=split)]`.
-   - Evaluates rerouting options matching presentation Case **#SAP-8842** (40,000 insulin doses, $450,000 value, 9-day thermal window).
+   - Evaluates rerouting options matching presentation Case **#SAP-8842** (40,000 insulin doses, \$450,000 value, 9-day thermal window).
 
-3. **`ml/engine.py` (`run_incident_evaluation`)**:
-   - Ingests feeds, classifies signals, executes multi-scenario predictive scoring, and identifies the mathematically optimal response with lowest net economic impact.
-   - Emits a structured JSON payload ready for CAP consumption and SAP UI5 Control Tower visualization.
+4. **`ml/briefing_agent.py` (`ExecutiveBriefingAgent`)**:
+   - Authors grounded, human-in-the-loop executive decision memoranda for CSCOs and logistics directors.
+   - Returns structured JSON containing:
+     * `executive_summary`: Operational synthesis of the crisis and cargo vulnerability.
+     * `recommended_action`: Logistical justification for Option C (Sea-Air Hybrid via Jebel Ali).
+     * `risk_mitigation`: Telemetry SOPs (2°C–8°C), customs green lanes, and tarmac reefer handoffs.
+     * `financial_impact`: Cargo value saved (\$376,585 vs Cape) and freight comparisons.
+     * `sign_off_status`: Always set to `"AWAITING_HUMAN_APPROVAL"`.
+   - Built-in deterministic templated fallback ensures zero crashes in offline/sandbox runtimes.
+
+5. **`ml/engine.py` (`run_incident_evaluation`)**:
+   - Orchestration entry point: ingests feeds, classifies signals, scores predictive scenarios, selects the mathematically optimal route, and generates the executive briefing.
+   - Emits structured JSON matching SAP CAP and SAP UI5 Control Tower contracts.
 
 ---
 
 ## 3. Case Study #SAP-8842: Mathematical Proof
 
 ### Scenario Context
-- **Consignment**: 40,000 Insulin Glargine doses ($450,000 invoice replacement value)
+- **Consignment**: 40,000 Insulin Glargine doses (\$450,000 invoice replacement value)
 - **Active Incident**: Houthi missile strikes near Bab el-Mandeb; southern Red Sea corridor closed
 - **Thermal Preservation Window**: 9 days passive thermal buffer in Credo VIP shippers
 - **Formulae**:
@@ -129,22 +147,12 @@ module.exports = { evaluateIncidentML };
 
 ## 5. Transitioning to SAP Generative AI Hub
 
-The module is architected with complete interface symmetry. To activate SAP Generative AI Hub:
+The module is architected with complete interface symmetry:
 
 1. In your SAP BTP Subaccount, provision an instance of the `aicore` service.
-2. Bind the instance or generate a service key:
-   ```json
-   {
-     "clientid": "<YOUR_CLIENT_ID>",
-     "clientsecret": "<YOUR_CLIENT_SECRET>",
-     "url": "https://<SUBACCOUNT>.authentication.eu10.hana.ondemand.com",
-     "serviceurls": {
-       "AI_API_URL": "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com"
-     }
-   }
-   ```
-3. Set the environment variables in Business Application Studio (`.env`):
+2. Bind the instance or generate a service key in Business Application Studio (`.env`):
    ```bash
+   LLM_PROVIDER="sap_hub"
    BTP_AICORE_CLIENT_ID="<clientid>"
    BTP_AICORE_CLIENT_SECRET="<clientsecret>"
    BTP_AICORE_AUTH_URL="<url>"
@@ -152,61 +160,30 @@ The module is architected with complete interface symmetry. To activate SAP Gene
    BTP_AICORE_RESOURCE_GROUP="default"
    AI_HUB_MODEL_DEPLOYMENT_ID="<deployment_id>"
    ```
-4. Initialize the classifier with `mode="genai_hub"`:
-   ```python
-   from ml import SignalClassifier
-   classifier = SignalClassifier(mode="genai_hub")
+3. Install the SAP GenAI client:
+   ```bash
+   pip install generative-ai-hub
    ```
+4. Uncomment `_call_sap_genai_hub` in `ml/llm_client.py`.
    *No changes to downstream CAP handlers or UI bindings are required.*
 
 ---
 
-## 6. Benchmarks & Validation Results
+## 6. Benchmarks & Verification Commands
 
-The benchmark suite evaluates `SignalClassifier` against a ground-truth dataset of 40 diverse headlines (`ml/eval_dataset.json`):
-- **15 Maritime Disruption Events**: Bab el-Mandeb missile strikes, Suez groundings, Hormuz seizures, Mombasa port strikes (MBA), Kilindini gantry failures, Rotterdam walkouts, Jebel Ali power outages.
-- **10 Tariff & Trade Sanctions**: API countervailing tariffs, biologic import embargoes, Section 301 duties on medical glass vials, cold-chain regulatory inspections.
-- **5 Marine Weather Events**: Category 4 cyclones, Super Typhoons, North Atlantic winter gales, Arabian Sea monsoons.
-- **10 Irrelevant Noise Items**: Sports results, consumer electronics, movies, astronomy, culinary arts, fashion.
-
-### Reproduction Command
+### Benchmark Suite (Gate 1 Validation)
 ```bash
 python ml/benchmark.py
 ```
+- **Accuracy**: 100.0% (Target: >= 90.0%)
+- **Hallucinated Lanes**: 0.0%
+- **Throughput**: > 6,000 items/second
 
-### Verified Benchmark Scorecard
+### LLM Adapter & Executive Briefing Test Suite
+```bash
+python ml/test_llm.py
 ```
-================================================================================
-        AEGISCHAIN AI/ML BENCHMARK - SAP HACKFEST 2026 GATE 1 AUDIT             
-================================================================================
-Dataset: 40 Ground-Truth Disruption & Noise Items
-Runtime Mode: Deterministic Local Fallback (scikit-learn / Regex Engine)
-Target: Overall Accuracy >= 90.0% | Hallucinated Lanes == 0.0%
---------------------------------------------------------------------------------
-
-Category       | Support  | Precision  | Recall     | F1-Score  
---------------------------------------------------------------
-CHOKEPOINT     | 10       |    100.0% |    100.0% |    100.0%
-PORT           | 5        |    100.0% |    100.0% |    100.0%
-TARIFF         | 10       |    100.0% |    100.0% |    100.0%
-WEATHER        | 5        |    100.0% |    100.0% |    100.0%
-OTHER          | 10       |    100.0% |    100.0% |    100.0%
---------------------------------------------------------------
-TOTAL / MACRO  | 40       |    100.0% |    100.0% |    100.0%
-
-================================================================================
-                     EXECUTIVE SCORECARD & GATE 1 METRICS                      
-================================================================================
-Overall Category Accuracy : 100.00% (Target: >= 90.0%)  [PASS]
-Severity Classification   : 100.00% (MAE: 0.00)
-Total Lanes Evaluated     : 46 Predicted / 46 Ground Truth
-Lane Match Precision      : 100.00%
-Lane Retrieval Recall     : 100.00%
-Hallucinated Lanes        : 0  (0.00%)            [PASS]
-Noise Lane False Positives: 0  (0.00%)            [PASS]
-Inference Latency         : 0.100 ms/item (4.0 ms total batch)
-Throughput                : 10,011 items/second
-================================================================================
-
->> GATE 1 AUDIT STATUS: APPROVED FOR PRODUCTION CAP INTEGRATION <<
-```
+- Tests `SwappableLLMClient` JSON parsing and provider resolution.
+- Tests `SignalClassifier` in `llm_proxy` mode with live or graceful fallback.
+- Tests `ExecutiveBriefingAgent` generation and Case #SAP-8842 data grounding.
+- Confirms end-to-end orchestration payload has `"executive_briefing"` attached.

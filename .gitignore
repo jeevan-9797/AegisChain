@@ -1,5 +1,19 @@
+# Dependencies & Build Artifacts
 node_modules/
 dist/
 mta_archives/
+
+# Environment Variables & Secrets (Zero-Credential Policy)
 .env
+*.env
 default-env.json
+
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

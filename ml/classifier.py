@@ -1,12 +1,13 @@
 """AegisChain Signal Classifier Module.
 
-Provides deterministic and GenAI-capable signal ingestion and classification for
+Provides deterministic, LLM proxy, and GenAI-capable signal ingestion and classification for
 autonomous maritime cold-chain disruption monitoring.
 Part of the AegisChain SAP Hackfest 2026 intelligence suite.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any, Dict, List, Tuple
@@ -17,14 +18,16 @@ logger = logging.getLogger("aegischain.classifier")
 class SignalClassifier:
     """Classifies maritime disruption news, feeds, and alerts into structured signals.
 
-    Operates in two modes:
+    Operates in three modes:
       1. 'deterministic': High-precision local heuristic/regex parsing for zero-credential
          environments (e.g. SAP BTP sandbox Gate 1 fallback).
-      2. 'genai_hub': Integration hook for SAP AI Core / Generative AI Hub foundation
+      2. 'llm_proxy': Live AI agent classification via SwappableLLMClient (Google AI Studio proxy)
+         with automatic, seamless fallback to the deterministic regex engine.
+      3. 'genai_hub': Integration hook for SAP AI Core / Generative AI Hub foundation
          models (requires provisioned BTP service credentials).
     """
 
-    SUPPORTED_MODES = ("deterministic", "genai_hub")
+    SUPPORTED_MODES = ("deterministic", "genai_hub", "llm_proxy")
 
     # Target chokepoints and waterways
     CHOKEPOINT_PATTERNS = [
@@ -87,7 +90,7 @@ class SignalClassifier:
         """Initialize the signal classifier.
 
         Args:
-            mode: Operational mode, either 'deterministic' or 'genai_hub'.
+            mode: Operational mode: 'deterministic', 'llm_proxy', or 'genai_hub'.
 
         Raises:
             ValueError: If an unsupported mode is provided.
@@ -132,9 +135,147 @@ class SignalClassifier:
                 "     - BTP_AICORE_RESOURCE_GROUP\n"
                 "  3. Deploy a foundation model (e.g. gpt-4o or gemini-1.5-pro) in SAP AI Launchpad.\n"
                 "  4. Set AI_HUB_MODEL_DEPLOYMENT_ID in your environment.\n"
-                "Operating under official Gate 1 Fallback Plan: Use mode='deterministic' for local execution."
+                "Operating under official Gate 1 Fallback Plan: Use mode='deterministic' or 'llm_proxy'."
             )
 
+        if self.mode == "llm_proxy":
+            try:
+                return self._classify_via_llm(raw_feed_items)
+            except Exception as exc:
+                logger.warning(
+                    "LLM Proxy classification encountered error: %s. Engaging deterministic fallback.",
+                    exc,
+                )
+                return self._classify_deterministic(raw_feed_items, is_fallback=True)
+
+        return self._classify_deterministic(raw_feed_items, is_fallback=True)
+
+    def _classify_via_llm(
+        self, raw_feed_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Classify signals using SwappableLLMClient with structured JSON schema."""
+        from ml.llm_client import SwappableLLMClient
+
+        client = SwappableLLMClient()
+
+        # Format input items for prompt
+        prepared_items = []
+        for idx, item in enumerate(raw_feed_items, start=1):
+            s_id = str(item.get("signal_id") or item.get("id") or f"SIG-{idx:04d}")
+            text = (
+                item.get("text")
+                or item.get("title")
+                or item.get("headline")
+                or item.get("content")
+                or ""
+            )
+            prepared_items.append({"signal_id": s_id, "text": text})
+
+        system_instruction = (
+            "You are AegisChain's autonomous maritime & pharmaceutical supply chain disruption classifier. "
+            "Analyze each news headline/feed item and classify it into structured signals.\n\n"
+            "Classification Rules:\n"
+            "1. category: Exactly one of ['CHOKEPOINT', 'PORT', 'TARIFF', 'WEATHER', 'OTHER']\n"
+            "   - CHOKEPOINT: Maritime transit straits/canals (Bab el-Mandeb, Red Sea, Suez, Hormuz, Panama, Malacca, Cape route).\n"
+            "   - PORT: Terminal strikes, dockworker walkouts, container yard congestion (Mombasa/MBA, Kilindini, Rotterdam, Jebel Ali).\n"
+            "   - TARIFF: Customs duties, API tariffs, export bans, sanitary/pharma regulatory embargoes, Section 301.\n"
+            "   - WEATHER: Cyclones, typhoons, gales, severe storms, ocean swell impeding vessels.\n"
+            "   - OTHER: Unrelated news, sports, entertainment, tech gadgets, general consumer finance.\n\n"
+            "2. severity: Integer 1 (Minor/Advisory), 2 (Moderate/Disruption), 3 (Critical/Closure/Missile Strike/Paralysis/Embargo)\n\n"
+            "3. impacted_lanes: List of strings chosen strictly from: "
+            "['RED_SEA', 'ASIA_EUROPE', 'SUEZ', 'HORMUZ', 'MIDDLE_EAST', 'EAST_AFRICA', 'MOMBASA_PORT', "
+            "'PANAMA_CANAL', 'MALACCA', 'EUROPE_GATEWAY', 'TRANS_PACIFIC', 'ASIA_PACIFIC', 'NORTH_ATLANTIC', "
+            "'ARABIAN_SEA', 'NORTH_SEA', 'GLOBAL_TRADE', 'CAPE_OF_GOOD_HOPE']. For OTHER items, use empty list [].\n\n"
+            "4. confidence: Float between 0.85 and 1.0.\n"
+            "5. summary: Concise 1-sentence diagnostic summary.\n\n"
+            "Return JSON matching this exact structure:\n"
+            "{\n"
+            '  "signals": [\n'
+            '    {"signal_id": "string", "title": "string", "category": "string", "severity": 1, '
+            '"impacted_lanes": ["string"], "confidence": 0.95, "summary": "string"}\n'
+            "  ]\n"
+            "}"
+        )
+
+        prompt = (
+            f"Please classify the following {len(prepared_items)} feed items:\n"
+            f"{json.dumps(prepared_items, indent=2)}"
+        )
+
+        response_dict = client.generate_structured_json(
+            prompt=prompt, system_instruction=system_instruction
+        )
+
+        signals_raw = response_dict.get("signals") or response_dict.get("items") or []
+        if not isinstance(signals_raw, list):
+            raise ValueError(f"LLM did not return a signals list: {response_dict}")
+
+        # Index signals by ID for robust mapping
+        signals_by_id = {str(s.get("signal_id", "")): s for s in signals_raw}
+
+        structured_signals: List[Dict[str, Any]] = []
+        for idx, item in enumerate(raw_feed_items, start=1):
+            signal_id = str(item.get("signal_id") or item.get("id") or f"SIG-{idx:04d}")
+            text = (
+                item.get("text")
+                or item.get("title")
+                or item.get("headline")
+                or item.get("content")
+                or ""
+            )
+            title = item.get("title") or (text[:80] + "..." if len(text) > 80 else text)
+
+            llm_item = signals_by_id.get(signal_id)
+            if not llm_item and idx - 1 < len(signals_raw):
+                llm_item = signals_raw[idx - 1]
+
+            if llm_item and llm_item.get("category") in (
+                "CHOKEPOINT",
+                "PORT",
+                "TARIFF",
+                "WEATHER",
+                "OTHER",
+            ):
+                category = str(llm_item["category"])
+                severity = int(llm_item.get("severity", 1))
+                lanes = list(llm_item.get("impacted_lanes", []))
+                confidence = float(llm_item.get("confidence", 0.95))
+                summary = str(llm_item.get("summary", title))
+
+                structured_signals.append(
+                    {
+                        "signal_id": signal_id,
+                        "title": title,
+                        "category": category,
+                        "severity": severity,
+                        "impacted_lanes": lanes,
+                        "confidence": round(confidence, 3),
+                        "is_fallback": False,
+                        "summary": summary,
+                    }
+                )
+            else:
+                # Individual item fallback if LLM omitted or corrupted this item
+                cat, sev, lanes, conf, summ = self._parse_deterministic_item(text)
+                structured_signals.append(
+                    {
+                        "signal_id": signal_id,
+                        "title": title,
+                        "category": cat,
+                        "severity": sev,
+                        "impacted_lanes": lanes,
+                        "confidence": round(conf, 3),
+                        "is_fallback": True,
+                        "summary": summ,
+                    }
+                )
+
+        return structured_signals
+
+    def _classify_deterministic(
+        self, raw_feed_items: List[Dict[str, Any]], is_fallback: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Apply deterministic heuristics and regex pattern matching to all feed items."""
         structured_signals: List[Dict[str, Any]] = []
 
         for idx, item in enumerate(raw_feed_items, start=1):
@@ -158,7 +299,7 @@ class SignalClassifier:
                     "severity": severity,
                     "impacted_lanes": lanes,
                     "confidence": round(confidence, 3),
-                    "is_fallback": True,
+                    "is_fallback": is_fallback,
                     "summary": summary,
                 }
             )
@@ -168,7 +309,7 @@ class SignalClassifier:
     def _parse_deterministic_item(
         self, text: str
     ) -> Tuple[str, int, List[str], float, str]:
-        """Apply deterministic heuristics and regex pattern matching to text."""
+        """Apply deterministic heuristics and regex pattern matching to a single text item."""
         t = text.lower()
 
         # Match category rules
