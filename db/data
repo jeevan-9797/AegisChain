@@ -1,0 +1,4 @@
+ID,name,country,region,reliabilityScore,riskLevel,leadTimeDays
+101,Taiwan Semi Corp,Taiwan,APAC,94.50,LOW,14
+102,Rhine Logistics GmbH,Germany,EMEA,78.20,MEDIUM,21
+103,Shenzhen Components Ltd,China,APAC,62.00,HIGH,30
