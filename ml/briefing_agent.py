@@ -51,11 +51,12 @@ class ExecutiveBriefingAgent:
         try:
             return self._generate_brief_via_llm(incident_data)
         except Exception as exc:
-            logger.warning(
-                "Executive briefing LLM generation encountered error: %s. "
-                "Engaging deterministic template fallback.",
-                exc,
-            )
+            if getattr(self.llm_client, "api_key", None):
+                logger.warning(
+                    "Executive briefing LLM generation encountered error: %s. "
+                    "Engaging deterministic template fallback.",
+                    exc,
+                )
             return self._deterministic_brief_fallback(incident_data)
 
     def _generate_brief_via_llm(self, incident_data: Dict[str, Any]) -> Dict[str, Any]:

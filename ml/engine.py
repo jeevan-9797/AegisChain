@@ -11,9 +11,12 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import math
+import numbers
 import os
 import sys
 import time
+from collections.abc import Mapping
 from typing import Any, Dict, List, Optional
 
 # Ensure repository root is on sys.path for direct script execution
@@ -52,6 +55,21 @@ def run_incident_evaluation(
     Returns:
         Structured JSON-serializable decision package.
     """
+    valid_cargo_value = not isinstance(cargo_value, bool) and isinstance(
+        cargo_value, numbers.Real
+    )
+    if valid_cargo_value:
+        try:
+            valid_cargo_value = math.isfinite(cargo_value) and cargo_value > 0
+        except OverflowError:
+            valid_cargo_value = False
+    if not valid_cargo_value:
+        raise ValueError("cargo_value must be a finite number greater than zero")
+
+    for index, item in enumerate(feed_items):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"feed_items[{index}] must be a mapping")
+
     start_time = time.perf_counter()
 
     # Step 1: Signal Classification

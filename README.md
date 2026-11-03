@@ -1,6 +1,6 @@
 # AegisChain
 
-SAP-based, AI-assisted supply-chain resilience application built with SAP CAP. The current repository includes a CAP backend and a SAPUI5 control-tower demo frontend using mock data.
+SAP-based supply-chain resilience application built with SAP CAP, a SAPUI5 control tower with mock and live modes, and a Python incident evaluator. The live CAP workflow persists explicit shipment/inventory impacts and pending recommendations; approval records a decision but never executes a recovery action.
 
 ## Project structure
 

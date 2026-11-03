@@ -1,5 +1,17 @@
 {
+  "name": "AgeisChain",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@cap-js/hana": "^3",
+    "@sap/cds": "^10"
+  },
   "devDependencies": {
-    "@sap/cds-dk": "^10.2.0"
-  }
+    "@cap-js/sqlite": "^3"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "test": "node --test"
+  },
+  "private": true
 }

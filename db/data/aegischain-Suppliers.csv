@@ -1,0 +1,4 @@
+ID,name,country,region,reliabilityScore,riskLevel,leadTimeDays
+55555555-5555-4555-8555-555555555555,Taiwan Semi Corp,Taiwan,APAC,94.50,LOW,14
+66666666-6666-4666-8666-666666666666,Rhine Logistics GmbH,Germany,EMEA,78.20,MEDIUM,21
+77777777-7777-4777-8777-777777777777,Shenzhen Components Ltd,China,APAC,62.00,HIGH,30

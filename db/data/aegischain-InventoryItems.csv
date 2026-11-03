@@ -1,0 +1,3 @@
+ID,materialNumber,description,location,quantity,unitOfMeasure,dataSource
+33333333-3333-4333-8333-333333333333,DEMO-MAT-2001,Industrial pump assembly,Rotterdam NL,48.000,EA,mockS4HANA
+44444444-4444-4444-8444-444444444444,DEMO-MAT-2002,Control module,Hamburg DE,12.000,EA,mockS4HANA

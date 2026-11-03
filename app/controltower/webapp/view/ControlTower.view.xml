@@ -8,7 +8,7 @@
     <!-- ============ PAGE + HEADER (bell, gear, avatar) ============ -->
     <Page id="page" title="AegisChain · Operator Control Tower" class="aegisPage">
         <headerContent>
-            <ObjectStatus text="LIVE · mock data" state="Success" icon="sap-icon://connected" class="sapUiSmallMarginEnd"/>
+            <ObjectStatus text="{/Meta/modeLabel}" state="{/Meta/modeState}" icon="sap-icon://connected" class="sapUiSmallMarginEnd"/>
             <Button id="bellBtn" icon="sap-icon://bell" text="{/Kpis/notifications}" type="Transparent"
                     tooltip="Notifications" press=".onOpenNotifications"/>
             <Button icon="sap-icon://action-settings" type="Transparent" tooltip="Policies and guardrails"
@@ -82,6 +82,10 @@
                     <!-- ===================== 2. SIGNALS ===================== -->
                     <IconTabFilter text="Signals" key="signals" icon="sap-icon://feed">
                         <OverflowToolbar>
+                            <Button text="Create live disruption" icon="sap-icon://add" type="Emphasized"
+                                    press=".onCreateLiveIncident" visible="{= ${/Meta/mode} === 'live' }"/>
+                            <Button text="Evaluate incident with ML" press=".onEvaluateIncidentWithML"
+                                    visible="{= ${/Meta/mode} === 'live' }"/>
                             <SearchField id="signalSearch" width="18rem" placeholder="Search headlines" liveChange=".onSignalFilter"/>
                             <SegmentedButton id="signalCategory" selectedKey="All" selectionChange=".onSignalFilter">
                                 <items>
@@ -94,24 +98,24 @@
                             </SegmentedButton>
                         </OverflowToolbar>
 
-                        <l:Grid defaultSpan="XL8 L8 M12 S12" hSpacing="1">
-                            <Table id="signalsTable" items="{/Signals}" headerText="Live signals" class="aegisCard">
+                        <l:Grid defaultSpan="XL8 L12 M12 S12" hSpacing="1">
+                            <Table id="signalsTable" items="{/Signals}" headerText="Live signals" class="aegisCard" fixedLayout="false" popinLayout="GridSmall">
                                 <columns>
-                                    <Column width="4rem"><Text text="Time"/></Column>
-                                    <Column width="8rem"><Text text="Source"/></Column>
-                                    <Column><Text text="Headline"/></Column>
-                                    <Column width="7rem"><Text text="Category"/></Column>
-                                    <Column width="4rem"><Text text="Sev."/></Column>
-                                    <Column width="8rem" minScreenWidth="Desktop" demandPopin="true"><Text text="Lanes"/></Column>
-                                    <Column width="7rem"><Text text="Confidence"/></Column>
-                                    <Column width="9rem"><Text text="Status"/></Column>
+                                    <Column><Text text="Time" wrapping="false"/></Column>
+                                    <Column minScreenWidth="Tablet" demandPopin="true"><Text text="Source"/></Column>
+                                    <Column width="40%"><Text text="Headline"/></Column>
+                                    <Column><Text text="Category" wrapping="false"/></Column>
+                                    <Column hAlign="Center"><Text text="Sev." wrapping="false"/></Column>
+                                    <Column minScreenWidth="Desktop" demandPopin="true"><Text text="Lanes"/></Column>
+                                    <Column width="8rem"><Text text="Confidence" wrapping="false"/></Column>
+                                    <Column><Text text="Status"/></Column>
                                 </columns>
                                 <items>
                                     <ColumnListItem>
-                                        <Text text="{time}"/>
+                                        <Text text="{time}" wrapping="false"/>
                                         <Text text="{source}"/>
                                         <Text text="{headline}"/>
-                                        <Text text="{category}"/>
+                                        <Text text="{category}" wrapping="false"/>
                                         <ObjectStatus text="{severity}" state="{= ${severity} === '3' ? 'Error' : ${severity} === '2' ? 'Warning' : 'None'}"/>
                                         <Text text="{lanes}"/>
                                         <ProgressIndicator percentValue="{confidence}" displayValue="{confidence}%" state="{= ${confidence} &lt; 60 ? 'Warning' : 'Success'}"/>
@@ -121,7 +125,7 @@
                             </Table>
 
                             <VBox>
-                                <layoutData><l:GridData span="XL4 L4 M12 S12"/></layoutData>
+                                <layoutData><l:GridData span="XL4 L12 M12 S12"/></layoutData>
                                 <MessageStrip text="Signals below 60% confidence wait for a human analyst." type="Information" class="sapUiSmallMarginBottom"/>
                                 <List id="analystQueue" headerText="Analyst queue" class="aegisCard"
                                       items="{path: '/Signals', filters: [{path: 'status', operator: 'EQ', value1: 'Needs analyst'}]}"
@@ -162,39 +166,39 @@
                                 <ObjectStatus text="{name}" state="{state}" icon="{icon}" class="sapUiMediumMarginEnd"/>
                             </HBox>
 
-                            <Table items="{options}" class="aegisCard"
-                                   headerText="Options compared by expected loss (Modeled)">
+                            <Table id="optionsTable" items="{options}" class="aegisCard" mode="SingleSelectLeft" fixedLayout="false" popinLayout="GridSmall"
+                                   headerText="{= ${/Meta/mode} === 'live' ? 'Recommendations from the CAP backend - select one to approve or reject' : 'Options compared by expected loss (Modeled) - select one to approve or reject'}">
                                 <columns>
-                                    <Column><Text text="Option"/></Column>
+                                    <Column width="22%"><Text text="Option"/></Column>
                                     <Column minScreenWidth="Desktop" demandPopin="true"><Text text="Route"/></Column>
-                                    <Column width="5rem"><Text text="Delay"/></Column>
-                                    <Column width="7rem"><Text text="Extra cost"/></Column>
-                                    <Column width="7rem"><Text text="Spoilage risk"/></Column>
-                                    <Column width="12rem"><Text text="Expected loss"/></Column>
-                                    <Column width="14rem"><Text text="Gate"/></Column>
+                                    <Column><Text text="Delay" wrapping="false"/></Column>
+                                    <Column><Text text="Extra cost" wrapping="false"/></Column>
+                                    <Column><Text text="Spoilage risk" wrapping="false"/></Column>
+                                    <Column width="10rem"><Text text="Expected loss"/></Column>
+                                    <Column width="14rem"><Text text="{= ${/Meta/mode} === 'live' ? 'Approval status' : 'Gate'}"/></Column>
                                 </columns>
                                 <items>
-                                    <ColumnListItem highlight="{highlight}">
+                                    <ColumnListItem highlight="{highlight}" selected="{= ${highlight} === 'Information'}">
                                         <Text text="{name}"/>
                                         <Text text="{route}"/>
-                                        <Text text="{delay}"/>
-                                        <Text text="{extraCost}"/>
-                                        <Text text="{spoilage}"/>
+                                        <Text text="{delay}" wrapping="false"/>
+                                        <Text text="{extraCost}" wrapping="false"/>
+                                        <Text text="{spoilage}" wrapping="false"/>
                                         <ProgressIndicator percentValue="{lossPct}" displayValue="{expectedLoss}" state="{barState}"/>
                                         <ObjectStatus text="{gate}" state="{gateState}"/>
                                     </ColumnListItem>
                                 </items>
                             </Table>
                             <Text text="Expected loss = extra freight + duty + spoilage risk x cargo value + shortage penalty"
-                                  class="sapUiTinyMarginTop"/>
-                            <MessageStrip text="{delta}" type="Success" showIcon="true" class="sapUiTinyMarginTop"/>
+                                  class="sapUiTinyMarginTop" visible="{= !(${/Meta/mode} === 'live')}"/>
+                            <MessageStrip text="{delta}" type="{= ${/Meta/mode} === 'live' ? 'Information' : 'Success'}" showIcon="true" class="sapUiTinyMarginTop"/>
 
                             <l:Grid defaultSpan="XL6 L6 M12 S12" hSpacing="1" class="sapUiSmallMarginTop">
-                                <List headerText="Governance gate" items="{gates}" class="aegisCard">
+                                <List headerText="Governance gate" items="{gates}" class="aegisCard" noDataText="Policy gates are not modeled in the backend yet">
                                     <StandardListItem title="{text}" description="{detail}" icon="{icon}" info="{result}" infoState="{state}" wrapping="true"/>
                                 </List>
                                 <Panel headerText="Decision brief" class="aegisCard">
-                                    <MessageStrip text="AI-written explanation · all numbers come from the model" type="Information" class="sapUiTinyMarginBottom"/>
+                                    <MessageStrip text="{= ${/Meta/mode} === 'live' ? 'Rationale as stored on the recommendation in CAP' : 'AI-written explanation · all numbers come from the model'}" type="Information" class="sapUiTinyMarginBottom"/>
                                     <Title text="{brief/headline}" level="H4" wrapping="true"/>
                                     <Text text="{brief/why}" class="sapUiTinyMarginTop"/>
                                     <List headerText="What you must check" items="{brief/mustCheck}" showNoData="false" class="sapUiTinyMarginTop">
@@ -279,7 +283,7 @@
                     <!-- ===================== 5. AUDIT ===================== -->
                     <IconTabFilter text="Audit" key="audit" icon="sap-icon://shield">
                         <OverflowToolbar>
-                            <ObjectStatus text="Audit chain verified" state="Success" icon="sap-icon://shield"/>
+                            <ObjectStatus text="{= ${/Meta/mode} === 'live' ? 'Live: decisions stored on each recommendation (hash chain not in backend yet)' : 'Audit chain verified (demo data)'}" state="{= ${/Meta/mode} === 'live' ? 'Information' : 'Success'}" icon="sap-icon://shield"/>
                             <ToolbarSpacer/>
                             <Button text="Generate audit report" icon="sap-icon://print" type="Emphasized" press=".onAuditReport"/>
                         </OverflowToolbar>
@@ -302,7 +306,7 @@
                             </Table>
                             <VBox>
                                 <layoutData><l:GridData span="XL5 L5 M12 S12"/></layoutData>
-                                <Table items="{/Actions}" headerText="Actions executed" noDataText="No actions yet - approve a plan first" class="aegisCard">
+                                <Table items="{/Actions}" headerText="Actions executed" noDataText="{= ${/Meta/mode} === 'live' ? 'Nothing executed - the backend records decisions only (executionStatus: notExecuted)' : 'No actions yet - approve a plan first'}" class="aegisCard">
                                     <columns>
                                         <Column><Text text="Type"/></Column>
                                         <Column><Text text="Reference"/></Column>
@@ -334,6 +338,15 @@
             <Dialog id="policyDialog" title="Policies and guardrails" contentWidth="460px">
                 <content>
                     <MessageStrip text="Read-only in demo - editable by Admin role" type="Information" class="sapUiSmallMargin"/>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBeginEnd sapUiSmallMarginBottom">
+                        <Label text="Data source:" class="sapUiSmallMarginEnd"/>
+                        <SegmentedButton id="modeSwitch" selectedKey="{/Meta/mode}" selectionChange=".onModeChange">
+                            <items>
+                                <SegmentedButtonItem key="mock" text="Mock (demo)"/>
+                                <SegmentedButtonItem key="live" text="Live CAP backend"/>
+                            </items>
+                        </SegmentedButton>
+                    </HBox>
                     <List items="{/Policies}">
                         <DisplayListItem label="{label}" value="{value}"/>
                     </List>

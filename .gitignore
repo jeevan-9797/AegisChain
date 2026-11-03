@@ -1,14 +1,17 @@
-# Dependencies & Build Artifacts
 node_modules/
 dist/
+target/
+_out/
+gen/
+.gen/
 mta_archives/
-
-# Environment Variables & Secrets (Zero-Credential Policy)
+*_mta_build_tmp
+*.mtar
 .env
 *.env
 default-env.json
-
-# Python Virtual Environments & Bytecode
+default-*.json
+.cdsrc-private.json
 .venv/
 venv/
 ENV/
@@ -17,3 +20,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+*.sqlite
+.DS_Store
+@cds-models

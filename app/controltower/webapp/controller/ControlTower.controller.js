@@ -5,11 +5,18 @@ sap.ui.define([
     "sap/m/Dialog",
     "sap/m/Button",
     "sap/m/TextArea",
+    "sap/m/MessageStrip",
+    "sap/m/Input",
+    "sap/m/Select",
+    "sap/m/Label",
+    "sap/m/VBox",
+    "sap/ui/core/Item",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
     "sap/ui/dom/includeScript",
-    "sap/ui/dom/includeStylesheet"
-], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, Filter, FilterOperator, includeScript, includeStylesheet) {
+    "sap/ui/dom/includeStylesheet",
+    "com/aegis/controltower/model/BackendAdapter"
+], function (Controller, MessageToast, MessageBox, Dialog, Button, TextArea, MessageStrip, Input, Select, Label, VBox, Item, Filter, FilterOperator, includeScript, includeStylesheet, BackendAdapter) {
     "use strict";
 
     // Leaflet (open-source map library) is loaded from a CDN - a "regular tool" fallback,
@@ -26,6 +33,75 @@ sap.ui.define([
                 includeStylesheet({ url: LEAFLET + "leaflet.css", id: "leaflet-css" }),
                 includeScript({ url: LEAFLET + "leaflet.js", id: "leaflet-js" })
             ]);
+
+            // Data source: mock.json (default) or Jeevan's CAP service (see model/BackendAdapter.js)
+            var oModel = this.getOwnerComponent().getModel();
+            oModel.dataLoaded().then(function () {
+                this._mockSnapshot = JSON.parse(JSON.stringify(oModel.getData()));
+                if (BackendAdapter.getMode() === "live") { this._loadLive(); }
+            }.bind(this));
+        },
+
+        /* ---------------------------------------------------------------
+         * DATA MODE  (mock <-> live CAP backend)
+         * ------------------------------------------------------------- */
+        _isLive: function () {
+            return this.getView().getModel().getProperty("/Meta/mode") === "live";
+        },
+
+        _loadLive: function () {
+            var oModel = this.getView().getModel() || this.getOwnerComponent().getModel();
+            return BackendAdapter.loadLive(this._mockSnapshot).then(function (oData) {
+                oModel.setData(oData);
+                this.byId("incidentDetail").bindElement("/Incidents/0");
+                BackendAdapter.setMode("live");
+            }.bind(this)).catch(function (oErr) {
+                BackendAdapter.setMode("mock");
+                this._loadMock();
+                MessageBox.warning("The CAP backend is not reachable, so the app switched back to mock data.\n\n"
+                    + "Start it from the repository root with: npm start\n\nDetails: " + oErr.message);
+            }.bind(this));
+        },
+
+        _loadMock: function () {
+            var oModel = this.getView().getModel() || this.getOwnerComponent().getModel();
+            oModel.setData(JSON.parse(JSON.stringify(this._mockSnapshot)));
+            this.byId("incidentDetail").bindElement("/Incidents/0");
+        },
+
+        onModeChange: function (oEvent) {
+            var sMode = oEvent.getParameter("item").getKey();
+            BackendAdapter.setMode(sMode);
+            if (sMode === "live") {
+                this._loadLive().then(function () {
+                    if (this._isLive()) { MessageToast.show("Live CAP data loaded"); }
+                }.bind(this));
+            } else {
+                this._loadMock();
+                MessageToast.show("Mock demo data loaded");
+            }
+        },
+
+        _selectedOption: function () {
+            var oItem = this.byId("optionsTable").getSelectedItem();
+            return oItem ? oItem.getBindingContext().getObject() : null;
+        },
+
+        _decideLive: function (sDecision, sNote) {
+            var oOpt = this._selectedOption();
+            if (!oOpt || !oOpt.recId) { MessageToast.show("Select a recommendation in the table first"); return; }
+            if (oOpt.approvalStatus !== "pending") { MessageToast.show("This recommendation has already been decided"); return; }
+            BackendAdapter.decide(oOpt.recId, sDecision, sNote).then(function (oRes) {
+                MessageBox.success("Decision recorded: " + oRes.decision
+                    + "\nexecutionStatus: " + oRes.executionStatus
+                    + "\n\nThe recovery action has NOT been executed - the backend only records the decision.");
+                return this._loadLive();
+            }.bind(this)).catch(function (oErr) {
+                MessageBox.error(oErr.status === 409
+                    ? "This recommendation was already decided by someone else. Refreshing."
+                    : "Could not record the decision: " + oErr.message);
+                this._loadLive();
+            }.bind(this));
         },
 
         /* ---------------------------------------------------------------
@@ -108,6 +184,254 @@ sap.ui.define([
             this.byId("signalsTable").getBinding("items").filter(aFilters);
         },
 
+        onCreateLiveIncident: function () {
+            if (!this._isLive()) { return; }
+            BackendAdapter.getImpactTargets().then(function (targets) {
+                this._openLiveIncidentDialog(targets);
+            }.bind(this)).catch(function (error) {
+                MessageBox.error("Could not load shipment and inventory impact choices: " + error.message);
+            });
+        },
+
+        onEvaluateIncidentWithML: function () {
+            if (!this._isLive()) { return; }
+            BackendAdapter.getImpactTargets().then(function (targets) {
+                this._openMlEvaluationDialog(targets);
+            }.bind(this)).catch(function (error) {
+                MessageBox.error("Could not load shipment and inventory impact choices: " + error.message);
+            });
+        },
+
+        _mlEvaluationErrorMessage: function (error) {
+            var message = String(error && error.message || "Unknown evaluation error");
+            var detail = message.toLowerCase();
+            if (error && error.status === 400) {
+                if (/feed_items/.test(detail)) { return "Enter a nonempty disruption feed item. No records were created."; }
+                if (/unknown (shipment|inventory item) id/.test(detail)) {
+                    return "A selected impact target no longer exists. Refresh the page and select it again. No records were created.";
+                }
+                if (/shipmentids|inventoryitemids|impact/.test(detail)) {
+                    return "Select at least one existing shipment or inventory item explicitly. No records were created.";
+                }
+                return "The evaluation request was rejected: " + message + ". No records were created.";
+            }
+            if (error && error.status === 422) {
+                if (/other or unsupported/.test(detail)) {
+                    return "ML classified the feed as OTHER or an unsupported category. No signal or recommendation was created.";
+                }
+                if (/multiple active disruptions/.test(detail)) {
+                    return "ML found multiple active disruptions. Evaluate one incident at a time; no records were created.";
+                }
+                if (/no active disruption/.test(detail)) {
+                    return "ML found no active moderate-or-higher disruption. No records were created.";
+                }
+                return "The evaluator could not create a recommendation from this feed: " + message + ". No records were created.";
+            }
+            return "Could not evaluate the incident: " + message + ". Refresh live data before retrying.";
+        },
+
+        _openMlEvaluationDialog: function (targets) {
+            function makeSelect(placeholder, values) {
+                var select = new Select({ width: "100%", selectedKey: "" });
+                select.addItem(new Item({ key: "", text: placeholder }));
+                values.forEach(function (value) {
+                    select.addItem(new Item({ key: value.key, text: value.text }));
+                });
+                return select;
+            }
+
+            var shipment = makeSelect("No shipment selected", targets.shipments.map(function (row) {
+                return { key: row.ID, text: row.shipmentNumber + " · " + row.origin + " → " + row.destination };
+            }));
+            var inventory = makeSelect("No inventory item selected", targets.inventoryItems.map(function (row) {
+                return { key: row.ID, text: row.materialNumber + " · " + row.description + " · " + row.location };
+            }));
+            var feed = new TextArea({
+                width: "100%", rows: 4, maxLength: 4000,
+                placeholder: "Paste one disruption alert or news item"
+            });
+            var cargoValue = new Input({ type: "Number", value: "450000" });
+            var incidentID = new Input({ value: "SAP-8842" });
+            var content = new VBox({ width: "100%", items: [
+                new MessageStrip({
+                    text: "Scenario economics use the SAP-8842 demonstration model; impact targets must be selected explicitly. Evaluation does not execute recovery actions.",
+                    type: "Information", showIcon: true
+                }),
+                new Label({ text: "Disruption feed item" }), feed,
+                new Label({ text: "Shipment impact (select explicitly)" }), shipment,
+                new Label({ text: "Inventory impact (select explicitly)" }), inventory,
+                new Label({ text: "Cargo value (USD)" }), cargoValue,
+                new Label({ text: "Incident ID" }), incidentID
+            ] });
+
+            var dialog;
+            var evaluateButton = new Button({
+                text: "Evaluate and create pending recommendation",
+                type: "Emphasized",
+                press: function () {
+                    var feedText = feed.getValue().trim();
+                    var shipmentID = shipment.getSelectedKey();
+                    var inventoryItemID = inventory.getSelectedKey();
+                    var cargo = Number(cargoValue.getValue());
+                    var incident = incidentID.getValue().trim();
+                    if (!feedText) {
+                        MessageBox.error("Enter one nonempty disruption feed item.");
+                        return;
+                    }
+                    if (!shipmentID && !inventoryItemID) {
+                        MessageBox.error("Select at least one existing shipment or inventory item explicitly.");
+                        return;
+                    }
+                    if (!Number.isFinite(cargo) || cargo <= 0 || !incident) {
+                        MessageBox.error("Enter a positive finite cargo value and an incident ID.");
+                        return;
+                    }
+
+                    evaluateButton.setEnabled(false);
+                    BackendAdapter.evaluateIncident({
+                        feed_items: [{ id: "UI-" + Date.now(), text: feedText }],
+                        cargo_value: cargo,
+                        incident_id: incident,
+                        shipmentIDs: shipmentID ? [shipmentID] : [],
+                        inventoryItemIDs: inventoryItemID ? [inventoryItemID] : []
+                    }).then(function (result) {
+                        dialog.close();
+                        return this._loadLive().then(function () {
+                            var summary = "ML created a " + result.category + " signal and linked pending recommendation."
+                                + "\nScenario: " + result.scenarioKey
+                                + "\nApproval: " + result.approvalStatus
+                                + " · Execution: " + result.executionStatus
+                                + "\nNo recovery action was executed.";
+                            if (this._isLive()) {
+                                MessageBox.success(summary);
+                            } else {
+                                MessageBox.warning("The records were created in CAP, but the live UI refresh failed. Refresh live data before evaluating again.\n\n" + summary);
+                            }
+                        }.bind(this));
+                    }.bind(this)).catch(function (error) {
+                        evaluateButton.setEnabled(true);
+                        MessageBox.error(this._mlEvaluationErrorMessage(error));
+                    }.bind(this));
+                }.bind(this)
+            });
+            dialog = new Dialog({
+                title: "Evaluate incident with ML",
+                contentWidth: "36rem",
+                content: [content],
+                beginButton: evaluateButton,
+                endButton: new Button({ text: "Cancel", press: function () { dialog.close(); } }),
+                afterClose: function () { dialog.destroy(); }
+            });
+            this.getView().addDependent(dialog);
+            dialog.open();
+        },
+
+        _openLiveIncidentDialog: function (targets) {
+            function makeSelect(placeholder, values) {
+                var select = new Select({ width: "100%", selectedKey: "" });
+                select.addItem(new Item({ key: "", text: placeholder }));
+                values.forEach(function (value) {
+                    select.addItem(new Item({ key: value.key, text: value.text }));
+                });
+                return select;
+            }
+
+            var type = makeSelect("Select a disruption type", [
+                { key: "Chokepoint", text: "Chokepoint" },
+                { key: "Port", text: "Port" },
+                { key: "Weather", text: "Weather" },
+                { key: "Tariff", text: "Tariff" }
+            ]);
+            var severity = makeSelect("Select severity", [
+                { key: "critical", text: "Critical" },
+                { key: "high", text: "High" },
+                { key: "medium", text: "Medium" },
+                { key: "low", text: "Low" }
+            ]);
+            var shipment = makeSelect("No shipment selected", targets.shipments.map(function (row) {
+                return { key: row.ID, text: row.shipmentNumber + " · " + row.origin + " → " + row.destination };
+            }));
+            var inventory = makeSelect("No inventory item selected", targets.inventoryItems.map(function (row) {
+                return { key: row.ID, text: row.materialNumber + " · " + row.description + " · " + row.location };
+            }));
+            var description = new Input({ maxLength: 500, placeholder: "Describe the disruption" });
+            var action = new Input({ maxLength: 500, placeholder: "Proposed recovery action" });
+            var rationale = new TextArea({ width: "100%", rows: 3, placeholder: "Why this fallback is proposed" });
+            var tradeoffs = new TextArea({ width: "100%", rows: 2, placeholder: "Known tradeoffs (optional)" });
+            var content = new VBox({ width: "100%", items: [
+                new Label({ text: "Disruption type" }), type,
+                new Label({ text: "Severity" }), severity,
+                new Label({ text: "Description" }), description,
+                new Label({ text: "Shipment impact (select explicitly)" }), shipment,
+                new Label({ text: "Inventory impact (select explicitly)" }), inventory,
+                new Label({ text: "Fallback recommendation action" }), action,
+                new Label({ text: "Rationale" }), rationale,
+                new Label({ text: "Tradeoffs" }), tradeoffs
+            ] });
+
+            var dialog;
+            var createButton = new Button({
+                text: "Create signal + pending recommendation",
+                type: "Emphasized",
+                press: function () {
+                    var shipmentID = shipment.getSelectedKey();
+                    var inventoryID = inventory.getSelectedKey();
+                    if (!type.getSelectedKey() || !severity.getSelectedKey() || !description.getValue().trim()) {
+                        MessageBox.error("Select a disruption type and severity, and enter a description.");
+                        return;
+                    }
+                    if (!shipmentID && !inventoryID) {
+                        MessageBox.error("Select at least one existing shipment or inventory impact.");
+                        return;
+                    }
+                    if (!action.getValue().trim() || !rationale.getValue().trim()) {
+                        MessageBox.error("Enter the fallback recommendation action and rationale.");
+                        return;
+                    }
+
+                    createButton.setEnabled(false);
+                    BackendAdapter.createIncident({
+                        type: type.getSelectedKey(),
+                        description: description.getValue().trim(),
+                        occurredAt: new Date().toISOString(),
+                        severity: severity.getSelectedKey(),
+                        shipmentImpacts: shipmentID ? [{ shipment_ID: shipmentID }] : [],
+                        inventoryImpacts: inventoryID ? [{ inventoryItem_ID: inventoryID }] : []
+                    }, {
+                        action: action.getValue().trim(),
+                        rationale: rationale.getValue().trim(),
+                        tradeoffs: tradeoffs.getValue().trim() || null
+                    }).then(function () {
+                        dialog.close();
+                        return this._loadLive().then(function () {
+                            MessageToast.show("Signal and pending fallback recommendation saved in CAP");
+                        });
+                    }.bind(this)).catch(function (error) {
+                        if (error.signalPersisted && error.signalID) {
+                            createButton.setEnabled(false);
+                            dialog.close();
+                            this._loadLive().then(function () {
+                                MessageBox.error(error.message + ". This form was closed to avoid creating a duplicate signal.");
+                            });
+                            return;
+                        }
+                        createButton.setEnabled(true);
+                        MessageBox.error("Could not create the live incident: " + error.message);
+                    }.bind(this));
+                }.bind(this)
+            });
+            dialog = new Dialog({
+                title: "Create live demo disruption",
+                contentWidth: "34rem",
+                content: [content],
+                beginButton: createButton,
+                endButton: new Button({ text: "Cancel", press: function () { dialog.close(); } }),
+                afterClose: function () { dialog.destroy(); }
+            });
+            this.getView().addDependent(dialog);
+            dialog.open();
+        },
+
         onConfirmSignal: function (oEvent) {
             var oCtx = oEvent.getSource().getBindingContext();
             oCtx.getModel().setProperty(oCtx.getPath() + "/status", "Watching");
@@ -122,8 +446,9 @@ sap.ui.define([
 
         /* ---------------------------------------------------------------
          * APPROVE / REJECT  (Incidents tab)
-         * LATER: replace the body of _executePlan with a call to the backend
-         * action  POST /odata/v4/aegis/decide  - the screen stays the same.
+         * Live mode : POST /odata/v4/aegis/decideRecommendation (records the decision only,
+         *             executionStatus "notExecuted").
+         * Mock mode : simulated story for the demo (_executePlan).
          * ------------------------------------------------------------- */
         onApprove: function () {
             var oCtx = this.byId("incidentDetail").getBindingContext();
@@ -135,7 +460,8 @@ sap.ui.define([
                 beginButton: new Button({
                     text: "Approve", type: "Emphasized",
                     press: function () {
-                        this._executePlan(oCtx, oComment.getValue());
+                        if (this._isLive()) { this._decideLive("approved", oComment.getValue()); }
+                        else { this._executePlan(oCtx, oComment.getValue()); }
                         oDialog.close();
                     }.bind(this)
                 }),
@@ -151,6 +477,7 @@ sap.ui.define([
             MessageBox.confirm("Reject the recommended plan? The incident goes back to the planner.", {
                 onClose: function (sAction) {
                     if (sAction !== MessageBox.Action.OK) { return; }
+                    if (this._isLive()) { this._decideLive("rejected", null); return; }
                     var oModel = oCtx.getModel();
                     oModel.setProperty(oCtx.getPath() + "/status", "Rejected - back to planner");
                     oModel.setProperty(oCtx.getPath() + "/statusState", "Error");
@@ -165,7 +492,7 @@ sap.ui.define([
             var sPath = oCtx.getPath();
 
             // 1. Status + all 5 stages done
-            oModel.setProperty(sPath + "/status", "Executed - approved by HK");
+            oModel.setProperty(sPath + "/status", "Executed - approved by HK (simulated in mock mode)");
             oModel.setProperty(sPath + "/statusState", "Success");
             oModel.getProperty(sPath + "/stages").forEach(function (s, i) {
                 oModel.setProperty(sPath + "/stages/" + i + "/state", "Success");
@@ -262,7 +589,9 @@ sap.ui.define([
                 "table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #D9DEE3;padding:6px;text-align:left}" +
                 "th{background:#F5F6F7}</style></head><body>" +
                 "<h1>AegisChain - Decision Audit Report</h1><p>Generated " + new Date().toLocaleString() +
-                " &middot; Chain verified: YES &middot; Figures are modeled</p>" +
+                " &middot; " + (oData.Meta && oData.Meta.mode === "live"
+                    ? "Source: live CAP backend &middot; decisions recorded, not executed &middot; no hash chain yet"
+                    : "Chain verified: YES (demo) &middot; Figures are modeled") + "</p>" +
                 "<h2>Decision trail</h2><table><tr><th>#</th><th>Time</th><th>Actor</th><th>Action</th><th>Hash</th></tr>" + rows + "</table>" +
                 "<h2>Actions executed</h2><table><tr><th>Type</th><th>Reference</th><th>Status</th></tr>" + acts + "</table>" +
                 "<p style='margin-top:32px;font-size:11px'>Confidential - generated by AegisChain</p>" +
@@ -289,8 +618,14 @@ sap.ui.define([
         },
 
         onResetDemo: function () {
+            if (this._isLive()) {
+                this.byId("policyDialog").close();
+                this._loadLive().then(function () { MessageToast.show("Live data refreshed (the CAP in-memory data resets when the server restarts)"); });
+                return;
+            }
             var oModel = this.getView().getModel();
             oModel.loadData(sap.ui.require.toUrl("com/aegis/controltower/model/mock.json")).then(function () {
+                this._mockSnapshot = JSON.parse(JSON.stringify(oModel.getData()));
                 this.byId("incidentDetail").bindElement("/Incidents/0");
                 this.byId("tabs").setSelectedKey("overview");
                 this.byId("policyDialog").close();
