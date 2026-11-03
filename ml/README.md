@@ -163,6 +163,21 @@ The module is architected with complete interface symmetry. To activate SAP Gene
 
 ## 6. Benchmarks & Validation Results
 
+### Local setup and unit tests
+
+From the repository root, install the pinned runtime dependencies and run the
+standard-library unit tests:
+
+```bash
+python -m pip install -r requirements.txt
+python -m unittest discover -s ml/tests -v
+```
+
+The direct runtime dependencies are pinned in `requirements.txt`. The public
+`run_incident_evaluation()` function requires `cargo_value` to be numeric,
+finite, and greater than zero. Feed entries must be mappings; invalid values
+raise `ValueError` with the offending field or entry index.
+
 The benchmark suite evaluates `SignalClassifier` against a ground-truth dataset of 40 diverse headlines (`ml/eval_dataset.json`):
 - **15 Maritime Disruption Events**: Bab el-Mandeb missile strikes, Suez groundings, Hormuz seizures, Mombasa port strikes (MBA), Kilindini gantry failures, Rotterdam walkouts, Jebel Ali power outages.
 - **10 Tariff & Trade Sanctions**: API countervailing tariffs, biologic import embargoes, Section 301 duties on medical glass vials, cold-chain regulatory inspections.
